@@ -1,9 +1,10 @@
-const CACHE_NAME = 'conto-vendita-v1';
+const CACHE_NAME = 'conto-vendita-v2';
 const ASSETS = [
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './esempio-prodotti.xlsx'
 ];
 
 self.addEventListener('install', e => {

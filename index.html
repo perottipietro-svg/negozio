@@ -238,12 +238,19 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
   </div>
   <div class="card" id="prodList"></div>
   <div class="card">
-    <details>
-      <summary>Importa più prodotti insieme</summary>
-      <p class="small muted">Incolla una riga per prodotto. Separatore <b>;</b> oppure <b>tab</b> (puoi copiare direttamente da Excel).<br>
-      Ordine colonne: <code class="inline">Nome ; Codice ; Prezzo ; Q.tà ricevuta ; Categoria</code> — solo il nome e il prezzo sono obbligatori.</p>
+    <h2>Importa prodotti da file</h2>
+    <p class="small muted" style="margin-top:0">Carica il listino in <b>Excel (.xlsx)</b> o <b>CSV</b>. Riconosco da solo le colonne
+      <i>Nome, Codice, Prezzo, Q.tà ricevuta, Categoria</i> dalle intestazioni: prima di importare ti mostro un'anteprima.</p>
+    <button class="btn primary block" id="btnPickFile">📄 Scegli un file</button>
+    <input type="file" id="prodFile" accept=".xlsx,.csv,.txt,text/csv" class="hidden">
+    <p class="small mt" style="margin-bottom:0"><a href="./esempio-prodotti.xlsx" download>⬇ Scarica un file di esempio</a>
+      <span class="muted">— 20 articoli già pronti, per provare.</span></p>
+    <details class="mt">
+      <summary>Oppure incolla le righe</summary>
+      <p class="small muted">Una riga per prodotto, separatore <b>;</b> o <b>tab</b> (puoi copiare direttamente da Excel).
+      Con o senza riga di intestazione.</p>
       <textarea id="importTxt" placeholder="Collana argento;COL01;24,50;10;Bigiotteria&#10;Bracciale cuoio;BRA02;18;6;Bigiotteria"></textarea>
-      <button class="btn primary block mt" id="btnImport">Importa</button>
+      <button class="btn block mt" id="btnImport">Anteprima importazione</button>
     </details>
   </div>
 </section>
@@ -658,24 +665,216 @@ function loadSheet(pid){
   });
 }
 
-/* ---------- import prodotti ---------- */
+/* ==========================================================================
+   IMPORT PRODOTTI (Excel .xlsx / CSV / testo incollato)
+   ========================================================================== */
+
+/* --- lettura zip: serve per aprire gli .xlsx --- */
+async function inflateRaw(u8){
+  if(typeof DecompressionStream==='undefined')throw new Error('Questo browser non sa leggere i file .xlsx. Salva il listino come CSV e riprova.');
+  const s=new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+async function unzip(buf){
+  const dv=new DataView(buf),u8=new Uint8Array(buf),dec=new TextDecoder();
+  let eo=-1;
+  for(let i=u8.length-22;i>=Math.max(0,u8.length-66000);i--){if(dv.getUint32(i,true)===0x06054b50){eo=i;break}}
+  if(eo<0)throw new Error('Il file non sembra un .xlsx valido.');
+  const n=dv.getUint16(eo+10,true);
+  let p=dv.getUint32(eo+16,true);
+  const entries=[];
+  for(let i=0;i<n;i++){
+    const nameLen=dv.getUint16(p+28,true),extraLen=dv.getUint16(p+30,true),cmtLen=dv.getUint16(p+32,true);
+    entries.push({
+      name:dec.decode(u8.subarray(p+46,p+46+nameLen)),
+      method:dv.getUint16(p+10,true),
+      csize:dv.getUint32(p+20,true),
+      lho:dv.getUint32(p+42,true)
+    });
+    p+=46+nameLen+extraLen+cmtLen;
+  }
+  const out={};
+  for(const e of entries){
+    const nl=dv.getUint16(e.lho+26,true),el=dv.getUint16(e.lho+28,true),st=e.lho+30+nl+el;
+    const raw=u8.subarray(st,st+e.csize);
+    out[e.name]=e.method===0?raw:await inflateRaw(raw);
+  }
+  return out;
+}
+function colIdx(letters){let n=0;for(const ch of letters)n=n*26+(ch.charCodeAt(0)-64);return n-1}
+
+async function readXlsx(file){
+  const files=await unzip(await file.arrayBuffer());
+  const dec=new TextDecoder(),P=new DOMParser();
+  const grab=n=>files[n]?dec.decode(files[n]):null;
+  const RELNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+  let target='xl/worksheets/sheet1.xml';
+  const wbx=grab('xl/workbook.xml'),relx=grab('xl/_rels/workbook.xml.rels');
+  if(wbx&&relx){
+    const wb=P.parseFromString(wbx,'application/xml'),rels=P.parseFromString(relx,'application/xml');
+    const map={};
+    [...rels.getElementsByTagName('Relationship')].forEach(r=>map[r.getAttribute('Id')]=r.getAttribute('Target'));
+    const sh=wb.getElementsByTagName('sheet')[0];
+    if(sh){
+      const rid=sh.getAttributeNS(RELNS,'id')||sh.getAttribute('r:id');
+      let t=map[rid];
+      if(t)target=t.charAt(0)==='/'?t.slice(1):'xl/'+t.replace(/^\.\//,'');
+    }
+  }
+  if(!files[target]){
+    const k=Object.keys(files).find(x=>/^xl\/worksheets\/.*\.xml$/.test(x));
+    if(!k)throw new Error('Nel file non ho trovato nessun foglio di calcolo.');
+    target=k;
+  }
+  let shared=[];
+  const ssx=grab('xl/sharedStrings.xml');
+  if(ssx)shared=[...P.parseFromString(ssx,'application/xml').getElementsByTagName('si')]
+    .map(si=>[...si.getElementsByTagName('t')].map(t=>t.textContent).join(''));
+
+  const doc=P.parseFromString(grab(target),'application/xml');
+  return [...doc.getElementsByTagName('row')].map(r=>{
+    const arr=[];
+    [...r.getElementsByTagName('c')].forEach(c=>{
+      const ref=(c.getAttribute('r')||'').replace(/[^A-Z]/g,'');
+      const t=c.getAttribute('t');
+      let v='';
+      if(t==='inlineStr')v=[...c.getElementsByTagName('t')].map(x=>x.textContent).join('');
+      else{
+        const vn=c.getElementsByTagName('v')[0];
+        v=vn?vn.textContent:'';
+        if(t==='s')v=shared[+v]||'';
+      }
+      arr[ref?colIdx(ref):arr.length]=v;
+    });
+    return arr;
+  });
+}
+
+function parseCSV(text){
+  const first=text.split(/\r?\n/)[0]||'';
+  const d=first.includes('\t')?'\t':(first.split(';').length>first.split(',').length?';':',');
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){
+      if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch;
+    }
+    else if(ch==='"')q=true;
+    else if(ch===d){row.push(cur);cur=''}
+    else if(ch==='\n'){row.push(cur);rows.push(row);row=[];cur=''}
+    else if(ch!=='\r')cur+=ch;
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row)}
+  return rows;
+}
+
+const HEAD={
+  nome:/^(nome|prodotto|descri|articolo|denomin|oggetto)/i,
+  sku:/^(codice|cod\b|cod\.|sku|rif|barcode|ean)/i,
+  prezzo:/^(prezzo|importo|costo|valore|p\.?\s*unit|listino)/i,
+  qta:/^(q\.?t|quant|pezzi|pz\b|n\.?\s*pezzi|ricevut|consegn|carico|giacen|scorta|stock)/i,
+  categoria:/^(categor|famiglia|tipo|gruppo|linea|reparto|collezione)/i
+};
+function mapRows(rows){
+  let hi=-1,map=null;
+  for(let i=0;i<Math.min(rows.length,12);i++){
+    const m={};
+    (rows[i]||[]).forEach((cell,j)=>{
+      const s=String(cell==null?'':cell).trim();
+      if(!s)return;
+      for(const k in HEAD)if(m[k]===undefined&&HEAD[k].test(s))m[k]=j;
+    });
+    if(m.nome!==undefined&&m.prezzo!==undefined){hi=i;map=m;break}
+  }
+  const headerFound=!!map;
+  if(!map)map={nome:0,sku:1,prezzo:2,qta:3,categoria:4};
+  const get=(r,k)=>map[k]===undefined?'':String(r[map[k]]==null?'':r[map[k]]).trim();
+  const items=[];
+  rows.slice(hi+1).forEach(r=>{
+    if(!r)return;
+    const nome=get(r,'nome');
+    if(!nome)return;
+    items.push({nome,sku:get(r,'sku'),prezzo:parseNum(get(r,'prezzo')),qta:parseNum(get(r,'qta')),categoria:get(r,'categoria')});
+  });
+  return{items,headerFound};
+}
+
+function findExisting(it){
+  return prods().find(p=>
+    (it.sku&&p.sku&&p.sku.toLowerCase()===it.sku.toLowerCase())||
+    p.nome.toLowerCase()===it.nome.toLowerCase());
+}
+
+function importPreview(items,headerFound,origine){
+  if(!items.length){
+    alert('Non ho trovato nessun prodotto.\n\nControlla che il foglio abbia una colonna con il nome e una con il prezzo.');
+    return;
+  }
+  const dupl=items.filter(findExisting).length;
+  const noPrice=items.filter(i=>!i.prezzo).length;
+  const conQta=items.filter(i=>i.qta>0).length;
+  openSheet(
+    '<h2>Anteprima importazione</h2>'
+    +'<p class="small muted" style="margin-top:-6px">'+esc(origine)+' — <b>'+items.length+'</b> prodotti riconosciuti'
+    +(headerFound?'':' <span class="badge warn">intestazioni non trovate: ho letto le colonne nell\'ordine Nome, Codice, Prezzo, Q.tà, Categoria</span>')+'</p>'
+    +(noPrice?'<p class="small"><span class="badge warn">'+noPrice+' senza prezzo</span> verranno importati a 0,00 €, poi li correggi.</p>':'')
+    +'<div class="tw" style="max-height:38vh;overflow-y:auto"><table><thead><tr><th>Prodotto</th><th>Codice</th><th class="n">Prezzo</th><th class="n">Q.tà</th><th>Categoria</th></tr></thead><tbody>'
+    +items.slice(0,60).map(i=>'<tr><td>'+esc(i.nome)+(findExisting(i)?' <span class="badge warn">già presente</span>':'')+'</td><td>'+esc(i.sku)+'</td><td class="n">'+eur(i.prezzo)+'</td><td class="n">'+(i.qta?num(i.qta):'')+'</td><td>'+esc(i.categoria)+'</td></tr>').join('')
+    +'</tbody></table></div>'
+    +(items.length>60?'<p class="tiny muted">…e altri '+(items.length-60)+'.</p>':'')
+    +(conQta?'<p class="tiny muted">Per '+conQta+' prodotti registro anche il carico della merce ricevuta.</p>':'')
+    +(dupl?'<label class="f row" style="align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="iUpd" style="width:20px;height:20px" checked><span style="margin:0">Aggiorna i '+dupl+' prodotti già presenti (altrimenti li salto)</span></label>':'')
+    +'<div class="row mt"><button class="btn ghost grow" id="iAnn">Annulla</button><button class="btn primary grow" id="iOk">Importa '+items.length+' prodotti</button></div>'
+  );
+  $('#iAnn').onclick=closeSheet;
+  $('#iOk').onclick=()=>{applyImport(items,dupl?$('#iUpd').checked:false);closeSheet()};
+}
+
+function applyImport(items,update){
+  let added=0,upd=0,skip=0;
+  items.forEach(it=>{
+    const ex=findExisting(it);
+    if(ex){
+      if(!update){skip++;return}
+      ex.nome=it.nome;
+      if(it.sku)ex.sku=it.sku;
+      if(it.prezzo)ex.prezzo=it.prezzo;
+      if(it.categoria)ex.categoria=it.categoria;
+      ex.updatedAt=now();upd++;
+      if(it.qta>0)DB.loads.push({id:uid(),productId:ex.id,qta:it.qta,data:today(),note:'Importazione',updatedAt:now()});
+    }else{
+      const p={id:uid(),nome:it.nome,sku:it.sku,prezzo:it.prezzo,categoria:it.categoria,attivo:true,updatedAt:now()};
+      DB.products.push(p);added++;
+      if(it.qta>0)DB.loads.push({id:uid(),productId:p.id,qta:it.qta,data:today(),note:'Carico iniziale',updatedAt:now()});
+    }
+  });
+  save();renderAll();
+  toast([added?added+' aggiunti':'',upd?upd+' aggiornati':'',skip?skip+' saltati':''].filter(Boolean).join(', ')||'Niente da importare');
+}
+
+$('#btnPickFile').onclick=()=>$('#prodFile').click();
+$('#prodFile').addEventListener('change',async e=>{
+  const f=e.target.files[0];
+  e.target.value='';
+  if(!f)return;
+  try{
+    let rows;
+    if(/\.xlsx$/i.test(f.name))rows=await readXlsx(f);
+    else rows=parseCSV(await f.text());
+    const{items,headerFound}=mapRows(rows);
+    importPreview(items,headerFound,f.name);
+  }catch(err){
+    alert('Non sono riuscito a leggere il file.\n\n'+(err.message||err)
+      +'\n\nSuggerimento: se è un .xls vecchio o un PDF, riaprilo in Excel e salvalo come .xlsx o CSV.');
+  }
+});
 $('#btnImport').onclick=()=>{
   const txt=$('#importTxt').value.trim();
   if(!txt){alert('Incolla prima le righe da importare.');return}
-  let ok=0,skip=0;
-  txt.split(/\r?\n/).forEach(line=>{
-    if(!line.trim())return;
-    const c=line.split(/\t|;/).map(x=>x.trim());
-    const nome=c[0];
-    if(!nome||/^nome$/i.test(nome)){skip++;return}
-    const p={id:uid(),nome,sku:c[1]||'',prezzo:parseNum(c[2]),categoria:c[4]||'',attivo:true,updatedAt:now()};
-    DB.products.push(p);
-    const q=parseNum(c[3]);
-    if(q>0)DB.loads.push({id:uid(),productId:p.id,qta:q,data:today(),note:'Carico iniziale',updatedAt:now()});
-    ok++;
-  });
-  save();$('#importTxt').value='';renderAll();
-  toast(ok+' prodotti importati'+(skip?' ('+skip+' righe saltate)':''));
+  const{items,headerFound}=mapRows(parseCSV(txt));
+  $('#importTxt').value='';
+  importPreview(items,headerFound,'Righe incollate');
 };
 
 /* ---------- REPORT ---------- */

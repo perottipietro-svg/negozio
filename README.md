@@ -13,8 +13,15 @@ nessuna scadenza.** Funziona anche offline e si installa sul telefono come una a
   quantità, prezzo, data e note.
 - **Vendite** — elenco per giorno, filtri di periodo, modifica ed eliminazione.
 - **Prodotti** — anagrafica (nome, codice, prezzo fornitore, categoria), carichi di merce
-  ricevuta e giacenza residua con avviso di scorta bassa. Importazione in blocco
-  incollando le righe da Excel.
+  ricevuta e giacenza residua con avviso di scorta bassa.
+- **Importazione del listino** — da file **.xlsx** o **CSV**, oppure incollando le righe.
+  Le colonne (*Nome, Codice, Prezzo, Q.tà ricevuta, Categoria*) vengono riconosciute dalle
+  intestazioni, in qualunque ordine e con diverse diciture; senza intestazioni si usa l'ordine
+  standard. Prima di scrivere niente viene mostrata un'anteprima, con segnalazione dei prodotti
+  già presenti (aggiornabili invece che duplicati). `esempio-prodotti.xlsx` è un listino di prova
+  con 20 articoli, scaricabile dall'app stessa.
+  I file .xlsx sono letti direttamente nel browser (zip + `DecompressionStream`), senza librerie.
+  I PDF non sono supportati: l'estrazione da PDF non è abbastanza affidabile per dei prezzi.
 - **Report** — si sceglie il periodo (di default la settimana scorsa, lunedì–domenica) e si
   scarica un `.xlsx` con tre fogli: *Riepilogo* (per prodotto), *Dettaglio* (vendita per vendita)
   e *Giacenza* (ricevuti / venduti / rimanenza). Storico dei rendiconti già inviati.
@@ -45,7 +52,8 @@ sullo stesso record da due dispositivi vince la più recente. Le eliminazioni ve
 
 | File | Ruolo |
 |---|---|
-| `index.html` | tutta l'app: interfaccia, logica, generatore XLSX, sincronizzazione |
+| `index.html` | tutta l'app: interfaccia, logica, lettore e generatore XLSX, sincronizzazione |
+| `esempio-prodotti.xlsx` | listino di prova con 20 articoli |
 | `manifest.json` | installazione come app sul telefono |
 | `sw.js` | service worker: funzionamento offline |
 | `icon-192.png`, `icon-512.png` | icone |
