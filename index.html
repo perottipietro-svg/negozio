@@ -92,6 +92,8 @@ textarea{min-height:64px;resize:vertical}
 .btn.danger{color:var(--danger);border-color:var(--danger-soft);background:var(--danger-soft)}
 .btn.block{width:100%}
 .btn.sm{padding:7px 11px;font-size:13.5px;border-radius:9px}
+.btn.wrap2{white-space:normal;line-height:1.25;font-size:14px;padding:9px 8px;text-align:center}
+.btn.wrap2.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
 /* ---------- nav ---------- */
@@ -294,25 +296,54 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
 
   <div class="card">
     <h2>Sincronizzazione telefono ↔ PC</h2>
-    <p class="small muted" style="margin-top:0">L'app funziona sempre, anche senza. Attivandola l'archivio viene salvato in un <b>Gist privato</b> del tuo account GitHub, così tutti i dispositivi restano allineati. Gratis e senza scadenza.</p>
-    <label class="f"><span>Token GitHub (classic, permesso <b>gist</b>)</span><input id="sTok" type="password" placeholder="ghp_…" autocomplete="off"></label>
-    <label class="f"><span>ID archivio (Gist) — vuoto = ne creo uno nuovo</span><input id="sGist" placeholder="es. 3f9a1c…" autocomplete="off"></label>
-    <div class="row wrap">
-      <button class="btn primary" id="btnSyncNow">Sincronizza ora</button>
-      <button class="btn danger" id="btnSyncOff">Disattiva</button>
+    <div class="small" id="syncInfo"></div>
+
+    <!-- stato: ATTIVA -->
+    <div id="syncOnBox" class="hidden">
+      <p class="small muted">Una volta attiva lavora da sola: ogni vendita che registri viene inviata subito,
+        e l'app ricontrolla se ci sono novità dall'altro dispositivo ogni minuto e ogni volta che la riapri.</p>
+      <div class="row wrap">
+        <button class="btn primary" id="btnLink">📱 Collega un altro dispositivo</button>
+        <button class="btn" id="btnSyncNow">Sincronizza ora</button>
+        <button class="btn danger" id="btnSyncOff">Disattiva</button>
+      </div>
     </div>
-    <div class="small mt" id="syncInfo"></div>
-    <details class="mt">
-      <summary>Come ottengo il token (una volta sola)</summary>
-      <ol class="small muted" style="padding-left:20px">
-        <li>Vai su <a href="https://github.com/settings/tokens/new?scopes=gist&description=Conto%20Vendita" target="_blank" rel="noopener">github.com/settings/tokens/new</a> (sei già loggato).</li>
-        <li>In <i>Expiration</i> scegli <b>No expiration</b>.</li>
-        <li>Spunta solo la casella <b>gist</b>.</li>
-        <li>Clicca <i>Generate token</i>, copia il codice e incollalo qui sopra.</li>
-        <li>Premi <b>Sincronizza ora</b>. Poi copia l'<b>ID archivio</b> che compare e incollalo anche sull'altro dispositivo, insieme allo stesso token.</li>
-      </ol>
-      <p class="small muted">Il token resta salvato solo su questo dispositivo e non finisce mai dentro l'archivio.</p>
-    </details>
+
+    <!-- stato: NON ATTIVA -->
+    <div id="syncOffBox">
+      <p class="small muted" style="margin-top:0">Senza sincronizzazione l'app funziona benissimo, ma i dati restano
+        su questo dispositivo. Attivandola l'archivio viene tenuto in un <b>Gist privato</b> del tuo account GitHub:
+        gratis, senza scadenza, e i dati restano tuoi.</p>
+
+      <div class="row" style="gap:8px;margin-bottom:12px">
+        <button class="btn grow wrap2" id="tabFirst">È il primo<br>dispositivo</button>
+        <button class="btn grow wrap2" id="tabSecond">Ne ho già uno<br>collegato</button>
+      </div>
+
+      <div id="paneFirst">
+        <ol class="small muted" style="padding-left:20px;margin-top:0">
+          <li>Apri <a href="https://github.com/settings/tokens/new?scopes=gist&description=Conto%20Vendita" target="_blank" rel="noopener">questa pagina di GitHub</a> (sei già loggato).</li>
+          <li>In <i>Expiration</i> scegli <b>No expiration</b>.</li>
+          <li>Più sotto spunta la sola casella <b>gist</b>.</li>
+          <li>In fondo clicca <i>Generate token</i> e copia il codice che compare.</li>
+        </ol>
+        <label class="f"><span>Incolla qui il token</span><input id="sTok" type="password" placeholder="ghp_…" autocomplete="off"></label>
+        <button class="btn primary block" id="btnSyncStart">Attiva sincronizzazione</button>
+        <p class="tiny muted mt" style="margin-bottom:0">Il token resta solo su questo dispositivo e non finisce mai dentro l'archivio.</p>
+      </div>
+
+      <div id="paneSecond" class="hidden">
+        <p class="small muted" style="margin-top:0">Sul dispositivo già collegato apri
+          <i>Impostazioni → Collega un altro dispositivo</i>: comparirà un codice QR.
+          Inquadralo con la fotocamera di questo dispositivo e sei a posto, non devi scrivere niente.</p>
+        <details>
+          <summary>Non riesci a inquadrarlo? Inserisci a mano</summary>
+          <label class="f"><span>Token GitHub</span><input id="sTok2" type="password" placeholder="ghp_…" autocomplete="off"></label>
+          <label class="f"><span>ID archivio</span><input id="sGist" placeholder="es. 3f9a1c…" autocomplete="off"></label>
+          <button class="btn primary block" id="btnSyncJoin">Collega questo dispositivo</button>
+        </details>
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -1082,8 +1113,7 @@ function renderImp(){
   $('#sForn').value=DB.shop.fornitore||'';
   $('#sMail').value=DB.shop.email||'';
   $('#sSoglia').value=DB.shop.soglia==null?2:DB.shop.soglia;
-  $('#sTok').value=CFG.token||'';
-  $('#sGist').value=CFG.gistId||'';
+  if(!CFG.on){$('#sTok').value='';$('#sTok2').value='';$('#sGist').value=''}
   const sz=(localStorage.getItem(DB_KEY)||'').length;
   $('#dbInfo').textContent=prods().length+' prodotti · '+sales().length+' vendite · '+Math.round(sz/1024)+' KB in memoria';
   paintSync();
@@ -1100,17 +1130,61 @@ function renderImp(){
 
 let syncState='off', syncErr='';
 function paintSync(){
+  if(!CFG.on)syncState='off';
   const pill=$('#syncPill');
   pill.className='sync-pill'+(syncState==='ok'?' on':syncState==='err'?' err':syncState==='busy'?' busy on':'');
   $('#syncTxt').textContent={off:'Locale',ok:'Sincronizzato',err:'Errore',busy:'Sincronizzo…'}[syncState];
   const info=$('#syncInfo');
   if(!info)return;
-  if(syncState==='off')info.innerHTML='<span class="muted">Sincronizzazione non attiva: i dati restano solo su questo dispositivo.</span>';
-  else if(syncState==='err')info.innerHTML='<span class="badge err">Errore</span> '+esc(syncErr);
-  else info.innerHTML='<span class="badge ok">Attiva</span> ultimo aggiornamento: '+(CFG.last?new Date(CFG.last).toLocaleString('it-IT'):'—')
-    +(CFG.gistId?'<div class="tiny muted mt">ID archivio da usare sull\'altro dispositivo:<br><code class="inline">'+esc(CFG.gistId)+'</code></div>':'');
+  $('#syncOnBox').classList.toggle('hidden',!CFG.on);
+  $('#syncOffBox').classList.toggle('hidden',!!CFG.on);
+  if(!CFG.on)info.innerHTML='<p class="small" style="margin-top:0"><span class="badge">Non attiva</span> i dati restano solo su questo dispositivo.</p>';
+  else if(syncState==='err')info.innerHTML='<p class="small" style="margin-top:0"><span class="badge err">Errore</span> '+esc(syncErr)+'</p>';
+  else info.innerHTML='<p class="small" style="margin-top:0"><span class="badge ok">Attiva</span> ultimo allineamento: '
+    +(CFG.last?new Date(CFG.last).toLocaleString('it-IT'):'—')+'</p>';
 }
 $('#syncPill').onclick=()=>{if(CFG.on)syncNow();else switchView('v-imp')};
+
+/* ---------- collegamento di un secondo dispositivo tramite QR ---------- */
+function pairPayload(){
+  const json=JSON.stringify({t:CFG.token,g:CFG.gistId});
+  const b64=btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return location.origin+location.pathname+'#s='+b64;
+}
+function readPairing(){
+  const m=location.hash.match(/[#&]s=([A-Za-z0-9_-]+)/);
+  if(!m)return false;
+  history.replaceState(null,'',location.origin+location.pathname);
+  try{
+    const b=m[1].replace(/-/g,'+').replace(/_/g,'/');
+    const d=JSON.parse(decodeURIComponent(escape(atob(b))));
+    if(!d.t||!d.g)return false;
+    CFG.token=d.t;CFG.gistId=d.g;CFG.on=true;CFG.lastSig='';saveCFG();
+    return true;
+  }catch(e){return false}
+}
+$('#btnLink').onclick=()=>{
+  if(!CFG.token||!CFG.gistId){alert('Prima attiva la sincronizzazione su questo dispositivo.');return}
+  const url=pairPayload();
+  let svg;
+  try{svg=qrSvg(url)}catch(e){svg='<p class="small">'+esc(e.message)+'</p>'}
+  openSheet(
+    '<h2>Collega un altro dispositivo</h2>'
+    +'<p class="small muted" style="margin-top:-6px">Apri la fotocamera dell\'altro dispositivo e inquadra questo codice: si aprirà l\'app già collegata a questo archivio.</p>'
+    +'<div style="background:#fff;border-radius:12px;padding:10px;max-width:300px;margin:0 auto">'+svg+'</div>'
+    +'<p class="tiny mt" style="color:var(--warn);background:var(--warn-soft);padding:8px 10px;border-radius:9px">'
+    +'Questo codice contiene la chiave del tuo archivio: mostralo solo al tuo dispositivo, non fotografarlo e non condividerlo.</p>'
+    +'<details><summary>Non funziona la fotocamera?</summary>'
+    +'<p class="small muted">Inserisci a mano, in <i>Ne ho già uno collegato</i>, il token che hai usato qui e questo ID archivio:</p>'
+    +'<code class="inline">'+esc(CFG.gistId)+'</code>'
+    +'<button class="btn sm mt" id="qCopy">Copia il link di collegamento</button></details>'
+    +'<button class="btn block mt" id="qClose">Chiudi</button>'
+  );
+  $('#qClose').onclick=closeSheet;
+  $('#qCopy').onclick=()=>{
+    navigator.clipboard.writeText(url).then(()=>toast('Link copiato'),()=>prompt('Copia questo link:',url));
+  };
+};
 
 const GIST_FILE='conto-vendita.json';
 async function gh(path,opts){
@@ -1150,6 +1224,9 @@ function mergeDB(remote){
 let pushTimer=null;
 function schedulePush(){clearTimeout(pushTimer);pushTimer=setTimeout(()=>syncNow(true),1500)}
 
+/* impronta del contenuto: evita di riscrivere l'archivio quando non è cambiato nulla */
+function sig(s){let h=5381;for(let i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return h.toString(36)+'.'+s.length}
+
 let syncing=false;
 async function syncNow(silent){
   if(!CFG.token){syncState='off';paintSync();if(!silent)alert('Inserisci prima il token GitHub.');return}
@@ -1165,13 +1242,14 @@ async function syncNow(silent){
         mergeDB(JSON.parse(content));
       }
     }
-    const payload=JSON.stringify({v:1,shop:DB.shop,products:DB.products,sales:DB.sales,loads:DB.loads,reports:DB.reports,meta:{updatedAt:now()}},null,1);
-    const body={files:{[GIST_FILE]:{content:payload}}};
-    if(CFG.gistId){
-      await gh('/gists/'+CFG.gistId,{method:'PATCH',body:JSON.stringify(body)});
-    }else{
-      const g=await gh('/gists',{method:'POST',body:JSON.stringify(Object.assign({description:'Conto Vendita — archivio',public:false},body))});
-      CFG.gistId=g.id;
+    const payload=JSON.stringify({v:1,shop:DB.shop,products:DB.products,sales:DB.sales,loads:DB.loads,reports:DB.reports,meta:{updatedAt:DB.meta.updatedAt}},null,1);
+    const s=sig(payload);
+    if(!CFG.gistId){
+      const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Conto Vendita — archivio',public:false,files:{[GIST_FILE]:{content:payload}}})});
+      CFG.gistId=g.id;CFG.lastSig=s;
+    }else if(s!==CFG.lastSig){
+      await gh('/gists/'+CFG.gistId,{method:'PATCH',body:JSON.stringify({files:{[GIST_FILE]:{content:payload}}})});
+      CFG.lastSig=s;
     }
     CFG.on=true;CFG.last=now();saveCFG();
     syncState='ok';
@@ -1185,14 +1263,31 @@ async function syncNow(silent){
     if($('#v-imp').classList.contains('active'))renderImp();
   }
 }
-$('#btnSyncNow').onclick=()=>{
-  CFG.token=$('#sTok').value.trim();
-  CFG.gistId=$('#sGist').value.trim();
-  saveCFG();syncNow();
+
+/* --- attivazione / collegamento --- */
+function syncTab(first){
+  $('#paneFirst').classList.toggle('hidden',!first);
+  $('#paneSecond').classList.toggle('hidden',first);
+  $('#tabFirst').classList.toggle('on',first);
+  $('#tabSecond').classList.toggle('on',!first);
+}
+$('#tabFirst').onclick=()=>syncTab(true);
+$('#tabSecond').onclick=()=>syncTab(false);
+syncTab(true);
+$('#btnSyncStart').onclick=()=>{
+  const t=$('#sTok').value.trim();
+  if(!t){alert('Incolla prima il token generato su GitHub.');return}
+  CFG.token=t;CFG.gistId='';CFG.lastSig='';saveCFG();syncNow();
 };
+$('#btnSyncJoin').onclick=()=>{
+  const t=$('#sTok2').value.trim(),g=$('#sGist').value.trim();
+  if(!t||!g){alert('Servono sia il token sia l\'ID archivio.');return}
+  CFG.token=t;CFG.gistId=g;CFG.lastSig='';saveCFG();syncNow();
+};
+$('#btnSyncNow').onclick=()=>syncNow();
 $('#btnSyncOff').onclick=()=>{
   if(!confirm('Disattivare la sincronizzazione su questo dispositivo? I dati locali restano.'))return;
-  CFG={token:'',gistId:'',on:false,last:0};saveCFG();syncState='off';renderImp();
+  CFG={token:'',gistId:'',on:false,last:0,lastSig:''};saveCFG();syncState='off';renderImp();
 };
 
 /* ---------- backup ---------- */
@@ -1224,12 +1319,218 @@ $('#btnWipe').onclick=()=>{
 };
 
 /* ==========================================================================
-   7. AVVIO
+   7. GENERATORE QR (modalità byte, correzione L, versioni 1-10)
+   ========================================================================== */
+const GF_EXP=new Uint8Array(512),GF_LOG=new Uint8Array(256);
+(function(){let x=1;for(let i=0;i<255;i++){GF_EXP[i]=x;GF_LOG[x]=i;x<<=1;if(x&0x100)x^=0x11d}
+  for(let i=255;i<512;i++)GF_EXP[i]=GF_EXP[i-255]})();
+const gmul=(a,b)=>(a&&b)?GF_EXP[GF_LOG[a]+GF_LOG[b]]:0;
+function rsGen(n){let g=[1];
+  for(let i=0;i<n;i++){const ng=new Array(g.length+1).fill(0);
+    for(let j=0;j<g.length;j++){ng[j]^=g[j];ng[j+1]^=gmul(g[j],GF_EXP[i])}
+    g=ng}
+  return g}
+function rsEcc(data,n){
+  const g=rsGen(n),res=new Uint8Array(data.length+n);
+  res.set(data);
+  for(let i=0;i<data.length;i++){
+    const c=res[i];
+    if(!c)continue;
+    for(let j=0;j<g.length;j++)res[i+j]^=gmul(g[j],c);
+  }
+  return res.slice(data.length);
+}
+const QRV={
+  total:[26,44,70,100,134,172,196,242,292,346],
+  eccPer:[7,10,15,20,26,18,20,24,30,18],
+  blocks:[1,1,1,1,1,2,2,2,2,4],
+  align:[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]],
+  vinfo:[0,0,0,0,0,0,0x07C94,0x085BC,0x09A99,0x0A4D3],
+  fmt:[0x77C4,0x72F3,0x7DAA,0x789D,0x662F,0x6318,0x6C41,0x6976]
+};
+const QRMASK=[
+  (r,c)=>(r+c)%2===0,
+  (r,c)=>r%2===0,
+  (r,c)=>c%3===0,
+  (r,c)=>(r+c)%3===0,
+  (r,c)=>((r/2|0)+(c/3|0))%2===0,
+  (r,c)=>(r*c)%2+(r*c)%3===0,
+  (r,c)=>((r*c)%2+(r*c)%3)%2===0,
+  (r,c)=>((r+c)%2+(r*c)%3)%2===0
+];
+
+function qrCodewords(text,forceVer){
+  const bytes=new TextEncoder().encode(text);
+  let v=0;
+  for(let i=1;i<=10;i++){
+    const dataCw=QRV.total[i-1]-QRV.eccPer[i-1]*QRV.blocks[i-1];
+    const cnt=i<10?8:16;
+    if(bytes.length<=((dataCw*8-4-cnt)>>3)){v=i;break}
+  }
+  if(forceVer)v=forceVer;
+  if(!v)throw new Error('Dati troppo lunghi per il codice QR.');
+  const dataCw=QRV.total[v-1]-QRV.eccPer[v-1]*QRV.blocks[v-1];
+  const bits=[],push=(val,n)=>{for(let i=n-1;i>=0;i--)bits.push((val>>i)&1)};
+  push(4,4);push(bytes.length,v<10?8:16);
+  bytes.forEach(b=>push(b,8));
+  const cap=dataCw*8;
+  for(let i=0;i<4&&bits.length<cap;i++)bits.push(0);
+  while(bits.length%8)bits.push(0);
+  const dw=[];
+  for(let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i+j];dw.push(b)}
+  const pad=[0xEC,0x11];
+  for(let k=0;dw.length<dataCw;k++)dw.push(pad[k%2]);
+  const nb=QRV.blocks[v-1],ne=QRV.eccPer[v-1];
+  const shortLen=(dataCw/nb)|0,nLong=dataCw%nb,nShort=nb-nLong;
+  const dbs=[],ebs=[];let p=0;
+  for(let i=0;i<nb;i++){
+    const len=shortLen+(i>=nShort?1:0);
+    const blk=dw.slice(p,p+len);p+=len;
+    dbs.push(blk);ebs.push(rsEcc(Uint8Array.from(blk),ne));
+  }
+  const out=[],maxLen=Math.max.apply(null,dbs.map(b=>b.length));
+  for(let i=0;i<maxLen;i++)dbs.forEach(b=>{if(i<b.length)out.push(b[i])});
+  for(let i=0;i<ne;i++)ebs.forEach(b=>out.push(b[i]));
+  return{v,cw:out};
+}
+
+function qrBuild(text,forceVer,forceMask){
+  const{v,cw}=qrCodewords(text,forceVer);
+  const n=17+4*v;
+  const mod=Array.from({length:n},()=>new Uint8Array(n));
+  const res=Array.from({length:n},()=>new Uint8Array(n));
+  const put=(r,c,val)=>{mod[r][c]=val;res[r][c]=1};
+  const finder=(r0,c0)=>{
+    for(let r=-1;r<=7;r++)for(let c=-1;c<=7;c++){
+      const rr=r0+r,cc=c0+c;
+      if(rr<0||rr>=n||cc<0||cc>=n)continue;
+      const on=(r>=0&&r<=6&&(c===0||c===6))||(c>=0&&c<=6&&(r===0||r===6))||(r>=2&&r<=4&&c>=2&&c<=4);
+      put(rr,cc,on?1:0);
+    }
+  };
+  finder(0,0);finder(0,n-7);finder(n-7,0);
+  for(let i=8;i<n-8;i++){put(6,i,i%2===0?1:0);put(i,6,i%2===0?1:0)}
+  const ac=QRV.align[v-1];
+  ac.forEach(r=>ac.forEach(c=>{
+    if((r<=8&&c<=8)||(r<=8&&c>=n-9)||(r>=n-9&&c<=8))return;
+    for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++)
+      put(r+dr,c+dc,Math.max(Math.abs(dr),Math.abs(dc))===1?0:1);
+  }));
+  put(n-8,8,1);
+  for(let i=0;i<=8;i++){if(!res[8][i])put(8,i,0);if(!res[i][8])put(i,8,0)}
+  for(let i=0;i<8;i++){if(!res[8][n-1-i])put(8,n-1-i,0);if(!res[n-1-i][8])put(n-1-i,8,0)}
+  if(v>=7){
+    const vi=QRV.vinfo[v-1];
+    for(let i=0;i<18;i++){
+      const b=(vi>>i)&1,r=(i/3)|0,c=i%3;
+      put(n-11+c,r,b);put(r,n-11+c,b);
+    }
+  }
+  let bi=0;
+  const nextBit=()=>{const byte=cw[bi>>3];const b=byte===undefined?0:(byte>>(7-(bi&7)))&1;bi++;return b};
+  let up=true;
+  for(let c=n-1;c>0;c-=2){
+    if(c===6)c=5;
+    for(let i=0;i<n;i++){
+      const r=up?n-1-i:i;
+      for(let j=0;j<2;j++){
+        const cc=c-j;
+        if(!res[r][cc])mod[r][cc]=nextBit();
+      }
+    }
+    up=!up;
+  }
+  const apply=m=>{
+    const g=mod.map(r=>Uint8Array.from(r));
+    for(let r=0;r<n;r++)for(let c=0;c<n;c++)
+      if(!res[r][c]&&QRMASK[m](r,c))g[r][c]^=1;
+    const f=QRV.fmt[m];
+    for(let i=0;i<15;i++){
+      const b=(f>>(14-i))&1;
+      if(i<6)g[8][i]=b; else if(i<8)g[8][i+1]=b; else if(i===8)g[7][8]=b; else g[14-i][8]=b;
+      if(i<7)g[n-1-i][8]=b; else g[8][n-15+i]=b;
+    }
+    g[n-8][8]=1;
+    return g;
+  };
+  if(forceMask!=null)return{n,g:apply(forceMask)};
+  let best=null,bestP=Infinity;
+  for(let m=0;m<8;m++){
+    const g=apply(m),p=qrPenalty(g,n);
+    if(p<bestP){bestP=p;best=g}
+  }
+  return{n,g:best};
+}
+
+function qrPenalty(g,n){
+  let p=0;
+  const run=(get)=>{
+    for(let a=0;a<n;a++){
+      let last=-1,len=0;
+      for(let b=0;b<n;b++){
+        const v=get(a,b);
+        if(v===last)len++;else{if(len>=5)p+=3+(len-5);last=v;len=1}
+      }
+      if(len>=5)p+=3+(len-5);
+    }
+  };
+  run((a,b)=>g[a][b]);run((a,b)=>g[b][a]);
+  for(let r=0;r<n-1;r++)for(let c=0;c<n-1;c++){
+    const s=g[r][c]+g[r][c+1]+g[r+1][c]+g[r+1][c+1];
+    if(s===0||s===4)p+=3;
+  }
+  const pat=[1,0,1,1,1,0,1,0,0,0,0],pat2=[0,0,0,0,1,0,1,1,1,0,1];
+  const match=(arr,i,pt)=>{for(let k=0;k<11;k++)if(arr[i+k]!==pt[k])return false;return true};
+  for(let r=0;r<n;r++){
+    const row=[],col=[];
+    for(let c=0;c<n;c++){row.push(g[r][c]);col.push(g[c][r])}
+    for(let i=0;i+11<=n;i++){
+      if(match(row,i,pat)||match(row,i,pat2))p+=40;
+      if(match(col,i,pat)||match(col,i,pat2))p+=40;
+    }
+  }
+  let dark=0;
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++)dark+=g[r][c];
+  p+=Math.floor(Math.abs(dark*100/(n*n)-50)/5)*10;
+  return p;
+}
+
+function qrSvg(text,px){
+  const{n,g}=qrBuild(text);
+  const q=4,size=n+q*2;
+  let path='';
+  for(let r=0;r<n;r++){
+    let c=0;
+    while(c<n){
+      if(!g[r][c]){c++;continue}
+      let w=0;
+      while(c+w<n&&g[r][c+w])w++;
+      path+='M'+(c+q)+' '+(r+q)+'h'+w+'v1h-'+w+'z';
+      c+=w;
+    }
+  }
+  return '<svg viewBox="0 0 '+size+' '+size+'" width="'+(px||280)+'" height="'+(px||280)+'" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto">'
+    +'<rect width="'+size+'" height="'+size+'" fill="#fff"/><path d="'+path+'" fill="#000"/></svg>';
+}
+window.qrBuild=qrBuild;
+
+/* ==========================================================================
+   8. AVVIO
    ========================================================================== */
 window.switchView=switchView;
+const paired=readPairing();
 renderAll();
-if(CFG.on&&CFG.token&&CFG.gistId)syncNow(true);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&CFG.on&&CFG.gistId)syncNow(true)});
+if(paired){
+  switchView('v-imp');
+  toast('Dispositivo collegato, scarico l\'archivio…');
+}
+if(CFG.on&&CFG.token)syncNow(true);
+
+/* la sincronizzazione lavora da sola: al ritorno sull'app, al rientro in rete e ogni minuto */
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&CFG.on)syncNow(true)});
+window.addEventListener('online',()=>{if(CFG.on)syncNow(true)});
+setInterval(()=>{if(CFG.on&&!document.hidden&&navigator.onLine!==false)syncNow(true)},60000);
+
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
 </body>

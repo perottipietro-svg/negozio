@@ -35,11 +35,23 @@ caricamento di dati su servizi di terzi.
 L'archivio può essere salvato in un **Gist privato** del proprio account GitHub, così tutti i
 dispositivi restano allineati. È gratuito e senza scadenza.
 
-1. Creare un token su <https://github.com/settings/tokens/new> — scadenza *No expiration*,
-   unico permesso da spuntare: **gist**.
-2. Incollarlo in *Impostazioni → Sincronizzazione* e premere **Sincronizza ora**.
-3. Copiare l'**ID archivio** che compare e inserirlo, insieme allo stesso token, anche
-   sull'altro dispositivo.
+**Primo dispositivo:** creare un token su <https://github.com/settings/tokens/new> — scadenza
+*No expiration*, unico permesso da spuntare **gist** — incollarlo in *Impostazioni →
+Sincronizzazione* e premere **Attiva sincronizzazione**.
+
+**Dispositivi successivi:** sul primo dispositivo premere *Collega un altro dispositivo*: compare
+un **codice QR**. Lo si inquadra con la fotocamera dell'altro dispositivo e l'app si apre già
+collegata — non c'è niente da digitare. Il QR contiene token e ID archivio in un frammento di URL
+(`#s=…`), che non viene mai inviato a nessun server e viene rimosso dalla barra degli indirizzi
+appena letto. Resta comunque una chiave: non va fotografato né condiviso. In alternativa si
+possono inserire token e ID archivio a mano.
+
+Il QR è generato dall'app stessa (`qrBuild`, modalità byte, correzione L, versioni 1-10, scelta
+automatica della maschera): niente librerie esterne. Le matrici prodotte sono state confrontate
+modulo per modulo con un'implementazione di riferimento su tutte le versioni e tutte e 8 le maschere.
+
+**Quando sincronizza:** all'apertura, a ogni modifica (dopo 1,5 s), al ritorno sull'app, al rientro
+in rete e comunque ogni minuto. L'archivio viene riscritto solo se il contenuto è davvero cambiato.
 
 Il token resta solo nel browser del dispositivo e non viene mai scritto dentro l'archivio.
 Se la sincronizzazione è spenta l'app funziona lo stesso: i dati restano in locale e si possono
