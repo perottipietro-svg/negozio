@@ -433,7 +433,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
 
 <script>
 "use strict";
-const APP_VER='2026.08.05-6';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
+const APP_VER='2026.08.05-7';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
 
 /* ==========================================================================
    1. STORAGE
@@ -596,6 +596,9 @@ function renderVendi(){
   $('#todayTot').textContent=eur(totOf(tod));
 
   const cats=[...new Set(prods().map(p=>p.categoria).filter(Boolean))].sort();
+  /* se la categoria filtrata non esiste più, nessun chip resterebbe evidenziato
+     e la griglia vuota sembrerebbe un archivio vuoto: meglio togliere il filtro */
+  if(catFilter&&!cats.includes(catFilter))catFilter='';
   $('#catChips').innerHTML=cats.length
     ? ['<button class="chip'+(catFilter===''?' active':'')+'" data-c="">Tutti</button>']
       .concat(cats.map(c=>'<button class="chip'+(catFilter===c?' active':'')+'" data-c="'+esc(c)+'">'+esc(c)+'</button>')).join('')
@@ -617,7 +620,17 @@ function renderVendi(){
     return;
   }
   e.classList.toggle('hidden',list.length>0);
-  if(!list.length)e.textContent='Nessun prodotto trovato.';
+  if(!list.length){
+    const parti=[];
+    if(q)parti.push('la ricerca «'+esc(q)+'»');
+    if(catFilter)parti.push('la categoria «'+esc(catFilter)+'»');
+    const tot=prods().filter(p=>p.attivo!==false).length;
+    e.innerHTML=parti.length
+      ? 'Nessun prodotto per '+parti.join(' e ')+'.<br><button class="btn mt" id="pgReset">Mostra tutti i '+tot+' prodotti</button>'
+      : 'Nessun prodotto in vendita: sono tutti segnati come non in vendita.<br><button class="btn mt" onclick="switchView(\'v-prodotti\')">Vai ai prodotti</button>';
+    const r=$('#pgReset');
+    if(r)r.onclick=()=>{catFilter='';$('#qSearch').value='';renderVendi()};
+  }
   g.innerHTML=list.map(p=>{
     const st=stock(p.id);
     const cls=st<=0?'zero':(soglia&&st<=soglia?'low':'');
@@ -1072,6 +1085,10 @@ function applyImport(items,update){
       if(it.qta>0)DB.loads.push({id:uid(),productId:p.id,qta:it.qta,data:today(),note:'Carico iniziale',updatedAt:now()});
     }
   });
+  /* dopo un'importazione i filtri della schermata Vendi vanno azzerati:
+     altrimenti quello che hai appena caricato può restare fuori dalla griglia */
+  catFilter='';
+  if($('#qSearch'))$('#qSearch').value='';
   save();renderAll();
   toast([added?added+' aggiunti':'',upd?upd+' aggiornati':'',skip?skip+' saltati':''].filter(Boolean).join(', ')||'Niente da importare');
 }
