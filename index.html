@@ -759,7 +759,12 @@ function prodSheet(id){
     +'<span class="tiny muted">imponibile, IVA esclusa</span></label>'
     +'<label class="f grow"><span>Prezzo di vendita (€)</span><input id="pV" type="number" inputmode="decimal" step="0.01" min="0" value="'+(p&&p.pv?p.pv:'')+'">'
     +'<span class="tiny muted">al pubblico, IVA inclusa</span></label></div>'
-    +'<div class="spread small muted" style="margin:-2px 0 10px"><span>Margine</span><b id="pMar"></b></div>'
+    +'<div class="spread small muted" style="margin:-2px 0 4px"><span>Margine</span><b id="pMar"></b></div>'
+    +'<div class="small" id="pBreak" style="margin-bottom:8px"></div>'
+    +'<div class="row" id="pSuggBox" style="align-items:flex-end;gap:8px;margin-bottom:12px">'
+    +'<label class="f grow" style="margin:0"><span>Margine desiderato (%)</span>'
+    +'<input id="pTarget" type="number" inputmode="decimal" min="0" max="95" step="1" value="'+(DB.shop.target||50)+'"></label>'
+    +'<button type="button" class="btn sm" id="pUse">Usa <b id="pSugg"></b></button></div>'
     +'<label class="f"><span>Categoria</span><input id="pC" list="catL" value="'+esc(p?p.categoria:'')+'">'
     +'<datalist id="catL">'+cats.map(c=>'<option value="'+esc(c)+'">').join('')+'</datalist></label>'
     +(p?'':'<label class="f"><span>Quantità ricevuta in conto vendita</span><input id="pQ" type="number" inputmode="decimal" min="0" step="1" value="0"></label>')
@@ -768,13 +773,34 @@ function prodSheet(id){
     +(p?'<button class="btn danger" id="pDel">Elimina</button>':'')
     +'<button class="btn primary grow" id="pOk">Salva</button></div>'
   );
+  /* prezzo di pareggio e prezzo suggerito.
+     Il margine è inteso sul venduto al netto dell'IVA, come quello mostrato sopra:
+     margine/imponibile = t  →  imponibile = costo/(1−t)  →  prezzo = imponibile × (1+IVA) */
   const updM=()=>{
-    const f=figs({productId:p?p.id:null,qta:1,prezzo:parseNum($('#pP').value),pv:parseNum($('#pV').value),iva:parseNum($('#pI').value)});
+    const costo=parseNum($('#pP').value), iva=parseNum($('#pI').value);
+    const f=figs({productId:p?p.id:null,qta:1,prezzo:costo,pv:parseNum($('#pV').value),iva:iva});
     const el=$('#pMar');
     el.textContent=f.pv>0?eur(f.margine)+' ('+num(pct(f.margine,f.impVen))+'%)':'—';
     el.style.color=f.pv>0&&f.margine<0?'var(--danger)':'';
+
+    const box=$('#pSuggBox'), br=$('#pBreak');
+    if(!(costo>0)){box.classList.add('hidden');br.textContent='';return}
+    box.classList.remove('hidden');
+    const pareggio=cent(costo*(1+iva/100));
+    br.innerHTML=(f.pv>0&&f.margine<0)
+      ? '<span class="badge err">in perdita</span> sotto '+eur(pareggio)+' ci rimetti: l\'IVA sul cartellino non è tua.'
+      : '<span class="muted">Vai in pareggio a '+eur(pareggio)+'.</span>';
+    const t=Math.min(Math.max(parseNum($('#pTarget').value),0),95);
+    const sugg=cent(costo/(1-t/100)*(1+iva/100));
+    $('#pSugg').textContent=eur(sugg);
+    $('#pUse').dataset.v=sugg;
   };
-  ['pP','pV','pI'].forEach(id=>$('#'+id).oninput=updM);
+  ['pP','pV','pI','pTarget'].forEach(id=>$('#'+id).oninput=updM);
+  $('#pUse').onclick=()=>{
+    $('#pV').value=$('#pUse').dataset.v;
+    DB.shop.target=parseNum($('#pTarget').value);DB.shop.updatedAt=now();save();
+    updM();
+  };
   updM();
   $('#pAnn').onclick=closeSheet;
   if(p)$('#pDel').onclick=()=>{

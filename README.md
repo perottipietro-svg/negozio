@@ -14,7 +14,9 @@ nessuna scadenza.** Funziona anche offline e si installa sul telefono come una a
 - **Vendite** — elenco per giorno, filtri di periodo, modifica ed eliminazione.
 - **Prodotti** — anagrafica (nome, codice, costo fornitore, prezzo di vendita, aliquota IVA,
   categoria), carichi di merce ricevuta e giacenza residua con avviso di scorta bassa.
-  Il margine è mostrato mentre si compila.
+  Mentre si compila la scheda vengono mostrati il margine, il **prezzo di pareggio**
+  (costo × (1+IVA): sotto quella cifra si è in perdita) e il **prezzo suggerito** per la
+  percentuale di margine desiderata, applicabile con un tocco.
 - **Importazione del listino** — da file **.xlsx** o **CSV**, oppure incollando le righe.
   Le colonne (*Nome, Codice, Prezzo, Q.tà ricevuta, Categoria*) vengono riconosciute dalle
   intestazioni, in qualunque ordine e con diverse diciture; senza intestazioni si usa l'ordine
