@@ -1,4 +1,4 @@
-const CACHE_NAME = 'conto-vendita-v4';
+const CACHE_NAME = 'conto-vendita-v5';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -6,6 +6,10 @@ const ASSETS = [
   './icon-512.png',
   './esempio-prodotti.xlsx'
 ];
+
+// Contenuti che devono essere sempre aggiornati quando c'è rete: la pagina e il
+// listino di esempio. La cache resta come rete di sicurezza per l'uso offline.
+const FRESH = /(\.html|\/|esempio-prodotti\.xlsx)$/;
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
@@ -21,15 +25,21 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+self.addEventListener('message', e => {
+  if (e.data === 'skipWaiting') self.skipWaiting();
+});
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  if (e.request.method !== 'GET') return;
   // Le chiamate a GitHub non vanno mai in cache
   if (url.hostname === 'api.github.com' || url.hostname === 'gist.githubusercontent.com') return;
 
-  // Network-first per l'HTML: prende sempre la versione aggiornata, offline usa la cache
-  if (e.request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {
+  if (e.request.destination === 'document' || FRESH.test(url.pathname)) {
+    // `cache: reload` scavalca anche la cache HTTP del browser, altrimenti il
+    // max-age di GitHub Pages ritarda gli aggiornamenti di parecchi minuti
     e.respondWith(
-      fetch(e.request)
+      fetch(new Request(url.href, { cache: 'reload', credentials: 'omit' }))
         .then(r => {
           const copy = r.clone();
           caches.open(CACHE_NAME).then(c => c.put(e.request, copy));

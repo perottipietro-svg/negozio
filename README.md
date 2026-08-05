@@ -100,6 +100,12 @@ anche la sincronizzazione, altrimenti l'archivio condiviso rimanderebbe tutto in
 | `esempio-prodotti.xlsx` | listino di prova con 20 articoli |
 | `manifest.json` | installazione come app sul telefono |
 | `sw.js` | service worker: funzionamento offline |
+
+Aggiornamenti: la pagina e `esempio-prodotti.xlsx` sono serviti sempre dalla rete quando c'è
+connessione (`fetch` con `cache: 'reload'`, che scavalca anche il `max-age` di GitHub Pages),
+con la cache come rete di sicurezza per l'uso offline. In *Impostazioni → Versione* è indicata
+la versione in esecuzione, con un pulsante che svuota cache e service worker e ricarica.
+La costante `APP_VER` in `index.html` va alzata a ogni rilascio.
 | `icon-192.png`, `icon-512.png` | icone |
 
 ## Deploy

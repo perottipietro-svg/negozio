@@ -404,6 +404,15 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
   </div>
 
   <div class="card">
+    <h2>Versione</h2>
+    <div class="spread">
+      <div class="small muted" id="verInfo"></div>
+      <button class="btn sm" id="btnUpd">Cerca aggiornamenti</button>
+    </div>
+    <p class="tiny muted" style="margin-bottom:0">Scarica subito l'ultima versione dell'app e del file di esempio, senza aspettare la cache del browser. I tuoi dati non vengono toccati.</p>
+  </div>
+
+  <div class="card">
     <h2>Zona pericolosa</h2>
     <button class="btn danger block" id="btnWipe">Cancella i dati e riparti da zero</button>
   </div>
@@ -424,6 +433,8 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
 
 <script>
 "use strict";
+const APP_VER='2026.08.05-6';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
+
 /* ==========================================================================
    1. STORAGE
    ========================================================================== */
@@ -1430,8 +1441,26 @@ function renderImp(){
   if(!CFG.on){$('#sTok').value='';$('#sTok2').value='';$('#sGist').value=''}
   const sz=(localStorage.getItem(DB_KEY)||'').length;
   $('#dbInfo').textContent=prods().length+' prodotti · '+sales().length+' vendite · '+Math.round(sz/1024)+' KB in memoria';
+  $('#verInfo').innerHTML='Versione <b>'+APP_VER+'</b>';
   paintSync();
 }
+
+/* Forza il ricarico saltando sia la cache del service worker sia quella HTTP:
+   senza, il max-age di GitHub Pages può ritardare un aggiornamento di minuti. */
+$('#btnUpd').onclick=async()=>{
+  const b=$('#btnUpd');b.disabled=true;b.textContent='Aggiorno…';
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister()));
+    }
+    if(window.caches){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k)));
+    }
+  }catch(e){}
+  location.replace(location.pathname+'?agg='+Date.now());
+};
 ['sShop','sForn','sMail','sSoglia','sIva'].forEach(id=>$('#'+id).addEventListener('change',()=>{
   DB.shop.nome=$('#sShop').value.trim();
   DB.shop.fornitore=$('#sForn').value.trim();
