@@ -84,7 +84,13 @@ Se la sincronizzazione è spenta l'app funziona lo stesso: i dati restano in loc
 spostare con *Esporta / Importa archivio*.
 
 Unione dei dati: ogni record ha un identificativo e una data di modifica; in caso di modifiche
-sullo stesso record da due dispositivi vince la più recente. Le eliminazioni vengono propagate.
+sullo stesso record da due dispositivi vince la più recente. Le eliminazioni viaggiano come
+"lapidi" (`deleted: true` con data di modifica), così spariscono anche sugli altri dispositivi
+invece di tornare indietro al primo allineamento; dopo 90 giorni le lapidi vengono buttate.
+
+Per lo stesso motivo *Cancella i dati* distingue fra **solo su questo dispositivo** — che spegne
+anche la sincronizzazione, altrimenti l'archivio condiviso rimanderebbe tutto indietro — e
+**su tutti i dispositivi**, che svuota anche l'archivio.
 
 ## Struttura
 

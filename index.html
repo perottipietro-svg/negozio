@@ -405,7 +405,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
 
   <div class="card">
     <h2>Zona pericolosa</h2>
-    <button class="btn danger block" id="btnWipe">Cancella tutti i dati di questo dispositivo</button>
+    <button class="btn danger block" id="btnWipe">Cancella i dati e riparti da zero</button>
   </div>
 </section>
 
@@ -432,8 +432,18 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const now=()=>Date.now();
 
 function blankDB(){return{v:1,shop:{nome:'',fornitore:'',email:'',soglia:2,updatedAt:0},products:[],sales:[],loads:[],reports:[],meta:{updatedAt:0}}}
+/* le "lapidi" dei record cancellati servono a propagare le eliminazioni agli
+   altri dispositivi; dopo 90 giorni hanno esaurito il loro scopo e si buttano */
+const TOMB_MS=90*24*3600*1000;
+function compact(d){
+  const lim=now()-TOMB_MS;
+  ['products','sales','loads','reports'].forEach(k=>{
+    if(Array.isArray(d[k]))d[k]=d[k].filter(r=>!(r.deleted&&(r.updatedAt||0)<lim));
+  });
+  return d;
+}
 function loadDB(){
-  try{const d=JSON.parse(localStorage.getItem(DB_KEY));if(d&&d.products)return Object.assign(blankDB(),d)}catch(e){}
+  try{const d=JSON.parse(localStorage.getItem(DB_KEY));if(d&&d.products)return compact(Object.assign(blankDB(),d))}catch(e){}
   return blankDB();
 }
 function loadCFG(){try{return Object.assign({token:'',gistId:'',on:false,last:0},JSON.parse(localStorage.getItem(CFG_KEY)||'{}'))}catch(e){return{token:'',gistId:'',on:false,last:0}}}
@@ -1617,10 +1627,52 @@ $('#fileIn').addEventListener('change',e=>{
   };
   rd.readAsText(f);e.target.value='';
 });
+/* Cancellare solo in locale non basta quando la sincronizzazione è attiva:
+   al primo allineamento l'archivio condiviso rimanda indietro tutto. Per
+   svuotare ovunque i record diventano "lapidi" (deleted + data recente), che
+   vincono sulle copie degli altri dispositivi e li svuotano a loro volta. */
+function wipeData(keepShop,everywhere){
+  const shop=Object.assign({},DB.shop);
+  if(everywhere){
+    const t=now();
+    ['products','sales','loads','reports'].forEach(k=>DB[k].forEach(r=>{r.deleted=true;r.updatedAt=t}));
+    if(!keepShop)DB.shop=Object.assign(blankDB().shop,{updatedAt:t});
+    save();
+  }else{
+    DB=blankDB();
+    if(keepShop)DB.shop=Object.assign(shop,{updatedAt:now()});
+    localStorage.setItem(DB_KEY,JSON.stringify(DB));
+  }
+  renderAll();
+}
 $('#btnWipe').onclick=()=>{
-  if(!confirm('Cancellare TUTTI i dati salvati su questo dispositivo? Operazione non annullabile.'))return;
-  if(!confirm('Sei davvero sicuro?'))return;
-  localStorage.removeItem(DB_KEY);DB=blankDB();renderAll();toast('Dati cancellati');
+  const on=CFG.on;
+  openSheet(
+    '<h2>Cancella i dati</h2>'
+    +'<p class="small muted" style="margin-top:-6px">Prodotti, vendite, carichi di merce e storico dei rendiconti. Non si torna indietro.</p>'
+    +'<label class="f row" style="align-items:center;gap:8px"><input type="checkbox" id="wKeep" style="width:20px;height:20px" checked>'
+    +'<span style="margin:0">Conserva nome negozio, fornitore e aliquota predefinita</span></label>'
+    +(on?'<p class="small"><span class="badge warn">sincronizzazione attiva</span> cancellando solo qui, al primo allineamento i dati tornerebbero indietro dall\'archivio condiviso: per questo spengo anche la sincronizzazione.</p>':'')
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +(on?'<button class="btn danger block" id="wAll">Cancella su tutti i dispositivi</button>':'')
+    +'<button class="btn danger block" id="wOne">Cancella solo su questo dispositivo</button>'
+    +'<button class="btn ghost block" id="wAnn">Annulla</button></div>'
+  );
+  $('#wAnn').onclick=closeSheet;
+  $('#wOne').onclick=()=>{
+    if(!confirm('Cancellare i dati di questo dispositivo?'+(on?'\n\nLa sincronizzazione verrà disattivata qui: gli altri dispositivi e l\'archivio restano come sono.':'')))return;
+    const keep=$('#wKeep').checked;
+    if(on){CFG={token:'',gistId:'',on:false,last:0,lastSig:''};saveCFG();syncState='off'}
+    wipeData(keep,false);closeSheet();renderImp();
+    toast('Dati cancellati su questo dispositivo');
+  };
+  if(on)$('#wAll').onclick=()=>{
+    if(!confirm('Cancellare i dati su TUTTI i dispositivi collegati, archivio condiviso compreso?'))return;
+    if(!confirm('Sei davvero sicuro? Non è annullabile.'))return;
+    wipeData($('#wKeep').checked,true);closeSheet();
+    syncNow();
+    toast('Dati cancellati ovunque');
+  };
 };
 
 /* ==========================================================================
