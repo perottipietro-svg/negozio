@@ -12,8 +12,9 @@ nessuna scadenza.** Funziona anche offline e si installa sul telefono come una a
   registra la vendita al prezzo del fornitore (con Annulla); toccando la scheda si aprono
   quantità, prezzo, data e note.
 - **Vendite** — elenco per giorno, filtri di periodo, modifica ed eliminazione.
-- **Prodotti** — anagrafica (nome, codice, prezzo fornitore, categoria), carichi di merce
-  ricevuta e giacenza residua con avviso di scorta bassa.
+- **Prodotti** — anagrafica (nome, codice, costo fornitore, prezzo di vendita, aliquota IVA,
+  categoria), carichi di merce ricevuta e giacenza residua con avviso di scorta bassa.
+  Il margine è mostrato mentre si compila.
 - **Importazione del listino** — da file **.xlsx** o **CSV**, oppure incollando le righe.
   Le colonne (*Nome, Codice, Prezzo, Q.tà ricevuta, Categoria*) vengono riconosciute dalle
   intestazioni, in qualunque ordine e con diverse diciture; senza intestazioni si usa l'ordine
@@ -22,13 +23,36 @@ nessuna scadenza.** Funziona anche offline e si installa sul telefono come una a
   con 20 articoli, scaricabile dall'app stessa.
   I file .xlsx sono letti direttamente nel browser (zip + `DecompressionStream`), senza librerie.
   I PDF non sono supportati: l'estrazione da PDF non è abbastanza affidabile per dei prezzi.
-- **Report** — si sceglie il periodo (di default la settimana scorsa, lunedì–domenica) e si
-  scarica un `.xlsx` con tre fogli: *Riepilogo* (per prodotto), *Dettaglio* (vendita per vendita)
-  e *Giacenza* (ricevuti / venduti / rimanenza). Storico dei rendiconti già inviati.
+- **Report** — due prospetti sullo stesso periodo (di default la settimana scorsa, lunedì–domenica):
+  - *Per il fornitore*: `.xlsx` con tre fogli — *Riepilogo* per prodotto, *Dettaglio* vendita per
+    vendita, *Giacenza* (ricevuti / venduti / rimanenza), ciascuno con imponibile, IVA e totale.
+    Prezzi di vendita e margini non compaiono. Storico dei rendiconti già inviati.
+  - *Il mio bilancio*: incassato, costo della merce, margine e percentuale, prospetto IVA
+    (imponibile e IVA sulle vendite, IVA sugli acquisti, differenza), dettaglio per prodotto e per
+    mese, esportabile in `.xlsx`.
 - **Impostazioni** — dati negozio e fornitore, sincronizzazione, backup.
 
-Il file Excel è generato interamente dentro il browser: nessuna libreria esterna, nessun
+I file Excel sono generati interamente dentro il browser: nessuna libreria esterna, nessun
 caricamento di dati su servizi di terzi.
+
+## Prezzi e IVA — le convenzioni
+
+| Campo | Significato |
+|---|---|
+| `prezzo` | costo del fornitore, **imponibile**, IVA esclusa |
+| `pv` | prezzo di vendita al pubblico, **lordo**, IVA inclusa |
+| `iva` | aliquota del prodotto; i nuovi partono dal valore predefinito in Impostazioni (22%) |
+
+Da qui discende tutto il resto: imponibile delle vendite = incasso ÷ (1 + aliquota), IVA sulle
+vendite = incasso − imponibile, IVA sugli acquisti = costo × aliquota, **margine = imponibile
+vendite − costo imponibile** (i due termini sono entrambi al netto dell'IVA, quindi confrontabili).
+
+Ogni vendita conserva la propria copia di costo, prezzo e aliquota: ritoccare il listino non
+cambia i rendiconti già emessi. Tutti gli importi sono arrotondati al centesimo **riga per riga**,
+così i totali coincidono sempre con la somma di ciò che si legge nel documento.
+
+Il prospetto IVA è un conteggio gestionale sulla merce venduta nel periodo: **non è la
+liquidazione IVA**, che segue le fatture registrate e non il momento della vendita.
 
 ## Sincronizzazione telefono ↔ PC (opzionale)
 
