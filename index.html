@@ -112,9 +112,27 @@ nav button.active{color:var(--accent-d)}
 /* ---------- product grid ---------- */
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .pcard{
+  position:relative;
   background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px;
   display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow);text-align:left;cursor:pointer;
 }
+/* un prodotto già venduto oggi resta riconoscibile a colpo d'occhio */
+.pcard.oggi{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+.pcard .cnt{
+  position:absolute;top:-9px;right:-6px;min-width:26px;height:26px;padding:0 8px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--accent);color:#fff;border:2px solid var(--bg);
+  border-radius:999px;font-size:13px;font-weight:800;letter-spacing:-.02em;
+}
+/* lampeggio al tocco: sul telefono è il segnale che la vendita è stata presa */
+@keyframes tap{
+  0%{transform:scale(.97);background:var(--accent);border-color:var(--accent)}
+  35%{transform:scale(1.03)}
+  100%{transform:scale(1);background:var(--card);border-color:var(--accent)}
+}
+.pcard.flash{animation:tap .55s ease-out}
+@keyframes cntpop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.pcard.flash .cnt{animation:cntpop .45s ease-out}
 .pcard .nm{font-weight:600;font-size:14.5px;line-height:1.25}
 .pcard .pr{font-size:15px;font-weight:700;color:var(--accent-d)}
 .pcard .st{font-size:11.5px;color:var(--muted)}
@@ -433,7 +451,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
 
 <script>
 "use strict";
-const APP_VER='2026.08.05-7';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
+const APP_VER='2026.08.05-8';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
 
 /* ==========================================================================
    1. STORAGE
@@ -498,7 +516,7 @@ function toast(msg,actLabel,actFn){
   if(actLabel){b.textContent=actLabel;b.classList.remove('hidden');b.onclick=()=>{hideToast();actFn&&actFn()}}
   else b.classList.add('hidden');
   t.classList.add('show');
-  clearTimeout(toast._t);toast._t=setTimeout(hideToast,actLabel?5000:2400);
+  clearTimeout(toast._t);toast._t=setTimeout(hideToast,actLabel?8000:2400);
 }
 function hideToast(){$('#toast').classList.remove('show')}
 
@@ -636,7 +654,9 @@ function renderVendi(){
     const cls=st<=0?'zero':(soglia&&st<=soglia?'low':'');
     const stTxt=loadedQty(p.id)?('restano '+num(st)):'giacenza non tracciata';
     const hasPv=p.pv>0;
-    return '<div class="pcard" data-id="'+p.id+'">'
+    const oggi=soldQty(p.id,t,t);
+    return '<div class="pcard'+(oggi?' oggi':'')+'" data-id="'+p.id+'">'
+      +(oggi?'<span class="cnt">'+num(oggi)+'</span>':'')
       +'<div class="nm">'+esc(p.nome)+'</div>'
       +(p.sku?'<div class="st">'+esc(p.sku)+'</div>':'')
       +'<div class="pr">'+(hasPv?eur(p.pv):'<span style="color:var(--warn)">prezzo mancante</span>')+'</div>'
@@ -652,11 +672,40 @@ function renderVendi(){
   });
   g.querySelectorAll('[data-plus]').forEach(b=>b.onclick=e2=>{
     e2.stopPropagation();
-    const p=prodById(b.dataset.plus);
-    if(!(p.pv>0)){saleSheet(p.id);toast('Manca il prezzo di vendita: indicalo qui');return}
-    const s=addSale({productId:p.id,qta:1,prezzo:p.prezzo,pv:p.pv,iva:ivaOf(p),data:today()});
+    vendiUno(prodById(b.dataset.plus));
+  });
+}
+
+/* Tocchi ravvicinati sullo stesso prodotto alzano la quantità della riga già
+   aperta invece di crearne una nuova: il doppio tocco per sbaglio si corregge
+   con un solo Annulla, e una vendita di 2 pezzi resta una riga sola. */
+const RIPETI_MS=20000;
+let ultimoTocco={};
+
+function vendiUno(p){
+  if(!(p.pv>0)){saleSheet(p.id);toast('Manca il prezzo di vendita: indicalo qui');return}
+  const t=today(), prec=ultimoTocco[p.id];
+  let s=null;
+  if(prec&&prec.ts>now()-RIPETI_MS){
+    const r=DB.sales.find(x=>x.id===prec.id&&!x.deleted);
+    if(r&&r.data===t&&r.pv===p.pv&&r.prezzo===p.prezzo){s=r;s.qta+=1;s.updatedAt=now();save()}
+  }
+  if(!s)s=addSale({productId:p.id,qta:1,prezzo:p.prezzo,pv:p.pv,iva:ivaOf(p),data:t});
+  ultimoTocco[p.id]={id:s.id,ts:now()};
+
+  try{if(navigator.vibrate)navigator.vibrate(18)}catch(e){}   /* su iOS non esiste, e va bene così */
+  renderVendi();
+  const card=$('#pgrid .pcard[data-id="'+p.id+'"]');
+  if(card)card.classList.add('flash');
+
+  const q=s.qta, id=s.id;
+  toast(num(q)+' × '+p.nome+' — '+eur(cent(q*p.pv)),'Annulla',()=>{
+    const r=DB.sales.find(x=>x.id===id&&!x.deleted);
+    if(!r)return;
+    if(r.qta>1){r.qta-=1;r.updatedAt=now();save()}
+    else{softDelete(DB.sales,id);delete ultimoTocco[p.id]}
     renderVendi();
-    toast('1 × '+p.nome+' — '+eur(p.pv),'Annulla',()=>{softDelete(DB.sales,s.id);renderVendi()});
+    toast(r.deleted?'Vendita annullata':'Tornato a '+num(r.qta)+' × '+p.nome);
   });
 }
 $('#qSearch').addEventListener('input',renderVendi);
@@ -1531,14 +1580,16 @@ $('#btnLink').onclick=()=>{
   try{svg=qrSvg(url)}catch(e){svg='<p class="small">'+esc(e.message)+'</p>'}
   openSheet(
     '<h2>Collega un altro dispositivo</h2>'
-    +'<p class="small muted" style="margin-top:-6px">Apri la fotocamera dell\'altro dispositivo e inquadra questo codice: si aprirà l\'app già collegata a questo archivio.</p>'
+    +'<p class="small muted" style="margin-top:-6px"><b>Telefono o tablet:</b> inquadra questo codice con la fotocamera. L\'app si apre già collegata a questo archivio.</p>'
     +'<div style="background:#fff;border-radius:12px;padding:10px;max-width:300px;margin:0 auto">'+svg+'</div>'
+    +'<p class="small muted mt" style="margin-bottom:6px"><b>Un altro computer,</b> o un dispositivo senza fotocamera: copia il link e aprilo su quella macchina, si collega da solo.</p>'
+    +'<button class="btn primary block" id="qCopy">📋 Copia il link di collegamento</button>'
     +'<p class="tiny mt" style="color:var(--warn);background:var(--warn-soft);padding:8px 10px;border-radius:9px">'
-    +'Questo codice contiene la chiave del tuo archivio: mostralo solo al tuo dispositivo, non fotografarlo e non condividerlo.</p>'
-    +'<details><summary>Non funziona la fotocamera?</summary>'
-    +'<p class="small muted">Inserisci a mano, in <i>Ne ho già uno collegato</i>, il token che hai usato qui e questo ID archivio:</p>'
-    +'<code class="inline">'+esc(CFG.gistId)+'</code>'
-    +'<button class="btn sm mt" id="qCopy">Copia il link di collegamento</button></details>'
+    +'Codice e link contengono la chiave del tuo archivio. Non fotografarli e non mandarli su chat o caselle che non siano tue: '
+    +'per passarli a un altro tuo computer va bene un\'email a te stesso o un file su una chiavetta.</p>'
+    +'<details><summary>Preferisci scrivere a mano?</summary>'
+    +'<p class="small muted">Sull\'altro dispositivo, in <i>Ne ho già uno collegato</i>, inserisci lo stesso token che hai usato qui e questo ID archivio:</p>'
+    +'<code class="inline">'+esc(CFG.gistId)+'</code></details>'
     +'<button class="btn block mt" id="qClose">Chiudi</button>'
   );
   $('#qClose').onclick=closeSheet;

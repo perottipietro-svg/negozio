@@ -9,8 +9,12 @@ nessuna scadenza.** Funziona anche offline e si installa sul telefono come una a
 ## Cosa fa
 
 - **Vendi** — griglia dei prodotti con ricerca e filtro per categoria. Un tocco su `+1 venduto`
-  registra la vendita al prezzo del fornitore (con Annulla); toccando la scheda si aprono
-  quantità, prezzo, data e note.
+  registra la vendita; toccando la scheda si aprono quantità, prezzo, data e note.
+  La scheda toccata lampeggia, prende il bordo colorato e mostra un contatore con i pezzi
+  venduti oggi, così sul telefono si vede subito che il tocco è andato a segno e quante volte.
+  Tocchi ravvicinati sullo stesso prodotto (entro 20 s, stesso giorno e stesso prezzo) alzano la
+  quantità della riga già aperta invece di crearne una nuova: il doppio tocco per sbaglio si
+  corregge con un solo *Annulla*, che toglie un pezzo alla volta ed elimina la riga se arriva a zero.
 - **Vendite** — elenco per giorno, filtri di periodo, modifica ed eliminazione.
 - **Prodotti** — anagrafica (nome, codice, costo fornitore, prezzo di vendita, aliquota IVA,
   categoria), carichi di merce ricevuta e giacenza residua con avviso di scorta bassa.
@@ -67,7 +71,9 @@ Sincronizzazione* e premere **Attiva sincronizzazione**.
 
 **Dispositivi successivi:** sul primo dispositivo premere *Collega un altro dispositivo*: compare
 un **codice QR**. Lo si inquadra con la fotocamera dell'altro dispositivo e l'app si apre già
-collegata — non c'è niente da digitare. Il QR contiene token e ID archivio in un frammento di URL
+collegata — non c'è niente da digitare. Per un **altro computer**, o qualsiasi dispositivo senza
+fotocamera, lo stesso pannello offre *Copia il link di collegamento*: basta aprire quel link sulla
+macchina da collegare. In alternativa si inseriscono token e ID archivio a mano. Il QR contiene token e ID archivio in un frammento di URL
 (`#s=…`), che non viene mai inviato a nessun server e viene rimosso dalla barra degli indirizzi
 appena letto. Resta comunque una chiave: non va fotografato né condiviso. In alternativa si
 possono inserire token e ID archivio a mano.
