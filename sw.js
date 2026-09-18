@@ -1,10 +1,11 @@
-const CACHE_NAME = 'conto-vendita-v5';
+const CACHE_NAME = 'conto-vendita-v6';
 const ASSETS = [
   './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  './esempio-prodotti.xlsx'
+  './esempio-prodotti.xlsx',
+  './vendor/zxing.min.js'     // lettore di codici a barre dove il browser non ne ha uno suo
 ];
 
 // Contenuti che devono essere sempre aggiornati quando c'è rete: la pagina e il

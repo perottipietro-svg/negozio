@@ -207,6 +207,43 @@ tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:0}
 .kpi span{font-size:11px;color:var(--muted)}
 code.inline{background:var(--bg);padding:2px 6px;border-radius:6px;font-size:12.5px;word-break:break-all}
 details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
+/* ---------- lettore codici a barre ---------- */
+.scanbtn{width:100%;padding:14px;font-size:17px;border-radius:13px;margin-bottom:10px}
+.kbhint{display:none}
+@media (hover:hover) and (pointer:fine){.kbhint{display:block}}
+#scanOv{position:fixed;inset:0;z-index:65;background:#0b0f13;color:#e8edf2;overflow-y:auto}
+#scanOv.hide{display:none}
+#scanOv .wrap{max-width:560px;margin:0 auto;padding:calc(10px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom))}
+#scanOv .top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+#scanOv .top h2{flex:1;font-size:17px;color:#fff}
+#scanOv input{background:#0f1419;color:#e8edf2;border-color:#2b3742}
+#scanOv .btn{background:#1b242c;color:#e8edf2;border-color:#2b3742}
+#scanOv .btn.primary{background:#0d9488;border-color:#0d9488;color:#fff}
+#scanOv .muted{color:#9aa7b2}
+.scanbox{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3;width:100%}
+.scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+.scanbox .guide{position:absolute;left:7%;right:7%;top:27%;bottom:27%;border:2px solid rgba(255,255,255,.9);
+  border-radius:10px;box-shadow:0 0 0 100vmax rgba(0,0,0,.38)}
+.scanbox .laser{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#f87171;box-shadow:0 0 10px #f87171;
+  animation:laser 1.4s ease-in-out infinite}
+@keyframes laser{50%{opacity:.25}}
+.scanbox .hit{position:absolute;inset:0;background:rgba(45,212,191,.55);opacity:0;transition:opacity .35s}
+.scanbox .hit.bad{background:rgba(239,68,68,.5)}
+.scanbox .hit.on{opacity:1;transition:none}
+.scanbox .msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:20px;font-size:14px;color:#cbd5e1}
+.scanstat{font-size:12.5px;color:#9aa7b2;margin:8px 2px 10px;min-height:17px}
+.scanres{background:#171f26;border:1px solid #26313b;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;
+  min-height:56px;margin-bottom:10px}
+.scanres .t{font-weight:700;font-size:15px}
+.scanres .s{font-size:12.5px;color:#9aa7b2}
+.scanres.ok{border-color:#2dd4bf}
+.scanres.ko{border-color:#f87171}
+.scanlist{font-size:13px;color:#cbd5e1;margin:0 2px 10px}
+.pickrow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid #26313b;cursor:pointer}
+.pickrow:last-child{border-bottom:0}
+.pickrow .t{font-weight:600;font-size:14.5px}
+.pickrow .s{font-size:12px;color:#9aa7b2}
 </style>
 </head>
 <body>
@@ -225,7 +262,9 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
       <div><h2 style="margin:0">Registra vendita</h2><div class="tiny muted" id="todayLbl"></div></div>
       <div class="right"><b id="todayTot" style="font-size:19px">0,00 €</b><div class="tiny muted">venduto oggi</div></div>
     </div>
-    <input id="qSearch" type="search" placeholder="Cerca prodotto…" autocomplete="off">
+    <button class="btn primary scanbtn" id="btnScan">📷 Scansiona codice a barre</button>
+    <p class="tiny muted kbhint" style="margin:-4px 0 10px">Hai un lettore USB o Bluetooth? Leggi il codice direttamente da questa schermata: la vendita si registra da sola.</p>
+    <input id="qSearch" type="search" placeholder="Cerca prodotto o digita il codice…" autocomplete="off">
     <div class="chips mt" id="catChips"></div>
   </div>
   <div class="pgrid" id="pgrid"></div>
@@ -259,19 +298,28 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
     </div>
     <input id="qProd" type="search" placeholder="Cerca…" autocomplete="off" style="margin-top:10px">
   </div>
+  <div class="card hidden" id="codeCard">
+    <div class="spread">
+      <div class="small" id="codeInfo"></div>
+      <button class="btn sm" id="btnAssoc">📷 Associa i codici</button>
+    </div>
+    <p class="tiny muted" style="margin-bottom:0">Passa gli articoli uno dopo l'altro davanti alla fotocamera e scegli a quale prodotto appartiene ciascun codice. Non registra vendite.</p>
+  </div>
   <div class="card" id="prodList"></div>
   <div class="card">
     <h2>Importa prodotti da file</h2>
     <p class="small muted" style="margin-top:0">Carica il listino in <b>Excel (.xlsx)</b> o <b>CSV</b>. Riconosco da solo le colonne
-      <i>Nome, Codice, Prezzo, Q.tà ricevuta, Categoria</i> dalle intestazioni: prima di importare ti mostro un'anteprima.</p>
+      <i>Nome, Codice, Codice a barre, Costo fornitore, Q.tà ricevuta, Categoria, Prezzo di vendita, IVA%</i> dalle intestazioni: prima di importare ti mostro un'anteprima.</p>
     <button class="btn primary block" id="btnPickFile">📄 Scegli un file</button>
     <input type="file" id="prodFile" accept=".xlsx,.csv,.txt,text/csv" class="hidden">
     <p class="small mt" style="margin-bottom:0"><a href="./esempio-prodotti.xlsx" download>⬇ Scarica un file di esempio</a>
-      <span class="muted">— 20 articoli già pronti, per provare.</span></p>
+      <span class="muted">— 32 articoli già pronti, con i codici a barre.</span><br>
+      <a href="./esempio-codici.html" target="_blank" rel="noopener">🏷 Codici a barre del file di esempio</a>
+      <span class="muted">— da aprire su un altro schermo o stampare, per provare il lettore.</span></p>
     <details class="mt">
       <summary>Oppure incolla le righe</summary>
       <p class="small muted">Una riga per prodotto, separatore <b>;</b> o <b>tab</b> (puoi copiare direttamente da Excel).
-      Con o senza riga di intestazione. Senza intestazione l’ordine è: <code class="inline">Nome ; Codice ; Costo ; Q.tà ; Categoria ; Prezzo vendita ; IVA%</code></p>
+      Con o senza riga di intestazione. Senza intestazione l’ordine è: <code class="inline">Nome ; Codice ; Costo ; Q.tà ; Categoria ; Prezzo vendita ; IVA% ; Codice a barre</code></p>
       <textarea id="importTxt" placeholder="Collana argento;COL01;24,50;10;Bigiotteria;45,00;22&#10;Bracciale cuoio;BRA02;18;6;Bigiotteria;35,00;22"></textarea>
       <button class="btn block mt" id="btnImport">Anteprima importazione</button>
     </details>
@@ -447,11 +495,27 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
 </nav>
 
 <div class="ov hide" id="ov"><div class="sheet" id="sheet"></div></div>
+
+<!-- lettore codici a barre: livello proprio, così non cancella la scheda aperta sotto -->
+<div id="scanOv" class="hide"><div class="wrap">
+  <div class="top"><h2 id="scTitle">Scansiona</h2>
+    <button class="btn sm hidden" id="scTorch">🔦</button>
+    <button class="btn sm" id="scClose">Fine</button></div>
+  <div class="scanbox"><video id="scVideo" playsinline muted></video>
+    <div class="guide"></div><div class="laser"></div><div class="hit" id="scHit"></div>
+    <div class="msg hidden" id="scMsg"></div></div>
+  <div class="scanstat" id="scStat">Avvio la fotocamera…</div>
+  <div id="scPanel"></div>
+  <div class="row" style="gap:8px">
+    <input id="scManual" class="grow" inputmode="numeric" autocomplete="off" placeholder="oppure digita il codice e premi Invio">
+    <button class="btn" id="scGo">OK</button>
+  </div>
+</div></div>
 <div id="toast"><span id="toastMsg"></span><button id="toastAct" class="hidden"></button></div>
 
 <script>
 "use strict";
-const APP_VER='2026.08.05-8';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
+const APP_VER='2026.09.18-1';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
 
 /* ==========================================================================
    1. STORAGE
@@ -491,6 +555,35 @@ const prods=()=>live(DB.products);
 const sales=()=>live(DB.sales);
 const loads=()=>live(DB.loads);
 const prodById=id=>DB.products.find(p=>p.id===id);
+
+/* --- codici a barre ---------------------------------------------------------
+   Un prodotto può avere più codici (p.ean, separati da virgola).
+   I codici si confrontano sempre in forma normalizzata:
+   - Excel a volte scrive i numeri lunghi in notazione scientifica
+   - un UPC-A (12 cifre) è lo stesso codice di un EAN-13 con uno zero davanti,
+     e un EAN-13 che inizia per 0 salvato come numero perde proprio quello zero */
+function normCode(c){
+  let s=String(c==null?'':c).trim();
+  if(!s)return '';
+  if(/^\d+([.,]\d+)?e\+?\d+$/i.test(s))s=Number(s.replace(',','.')).toFixed(0);
+  s=s.replace(/\s+/g,'');
+  if(/^\d+$/.test(s))return s.length===12?'0'+s:s;
+  return s.toUpperCase();
+}
+const splitCodes=txt=>String(txt||'').split(/[,;\s]+/).map(normCode).filter(Boolean);
+const codesOf=p=>splitCodes(p&&p.ean);
+function prodByCode(code){
+  const c=normCode(code);
+  if(!c)return null;
+  return prods().find(p=>codesOf(p).includes(c))
+      || prods().find(p=>p.sku&&normCode(p.sku)===c)
+      || null;
+}
+function addCode(p,code){
+  const all=codesOf(p),c=normCode(code);
+  if(c&&!all.includes(c))all.push(c);
+  p.ean=all.join(', ');p.updatedAt=now();
+}
 
 /* ==========================================================================
    2. UTILITY
@@ -628,7 +721,7 @@ function renderVendi(){
   const list=prods()
     .filter(p=>p.attivo!==false)
     .filter(p=>!catFilter||p.categoria===catFilter)
-    .filter(p=>!q||(p.nome+' '+(p.sku||'')).toLowerCase().includes(q))
+    .filter(p=>!q||(p.nome+' '+(p.sku||'')+' '+(p.ean||'')).toLowerCase().includes(q))
     .sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
 
   const g=$('#pgrid'),e=$('#pgridEmpty');
@@ -682,8 +775,10 @@ function renderVendi(){
 const RIPETI_MS=20000;
 let ultimoTocco={};
 
-function vendiUno(p){
-  if(!(p.pv>0)){saleSheet(p.id);toast('Manca il prezzo di vendita: indicalo qui');return}
+/* opt.quiet: niente messaggio in basso (il lettore mostra il suo riepilogo) */
+function vendiUno(p,opt){
+  opt=opt||{};
+  if(!(p.pv>0)){saleSheet(p.id);toast('Manca il prezzo di vendita: indicalo qui');return null}
   const t=today(), prec=ultimoTocco[p.id];
   let s=null;
   if(prec&&prec.ts>now()-RIPETI_MS){
@@ -698,15 +793,23 @@ function vendiUno(p){
   const card=$('#pgrid .pcard[data-id="'+p.id+'"]');
   if(card)card.classList.add('flash');
 
-  const q=s.qta, id=s.id;
-  toast(num(q)+' × '+p.nome+' — '+eur(cent(q*p.pv)),'Annulla',()=>{
-    const r=DB.sales.find(x=>x.id===id&&!x.deleted);
-    if(!r)return;
-    if(r.qta>1){r.qta-=1;r.updatedAt=now();save()}
-    else{softDelete(DB.sales,id);delete ultimoTocco[p.id]}
-    renderVendi();
-    toast(r.deleted?'Vendita annullata':'Tornato a '+num(r.qta)+' × '+p.nome);
-  });
+  if(!opt.quiet){
+    const id=s.id;
+    toast(num(s.qta)+' × '+p.nome+' — '+eur(cent(s.qta*p.pv)),'Annulla',()=>{
+      const rest=annullaUno(p,id);
+      toast(rest?'Tornato a '+num(rest)+' × '+p.nome:'Vendita annullata');
+    });
+  }
+  return s;
+}
+/* toglie un pezzo dalla riga; restituisce la quantità rimasta (0 = riga eliminata) */
+function annullaUno(p,id){
+  const r=DB.sales.find(x=>x.id===id&&!x.deleted);
+  if(!r)return 0;
+  if(r.qta>1){r.qta-=1;r.updatedAt=now();save()}
+  else{softDelete(DB.sales,id);delete ultimoTocco[p.id]}
+  renderVendi();
+  return r.deleted?0:r.qta;
 }
 $('#qSearch').addEventListener('input',renderVendi);
 
@@ -806,7 +909,12 @@ function renderProdotti(){
   const q=$('#qProd').value.trim().toLowerCase();
   const all=prods().sort((a,b)=>a.nome.localeCompare(b.nome,'it'));
   $('#pCount').textContent=all.length?'('+all.length+')':'';
-  const list=all.filter(p=>!q||(p.nome+' '+(p.sku||'')+' '+(p.categoria||'')).toLowerCase().includes(q));
+  const senzaCod=all.filter(p=>!codesOf(p).length).length;
+  $('#codeCard').classList.toggle('hidden',!all.length);
+  $('#codeInfo').innerHTML=senzaCod
+    ?'<b>'+senzaCod+'</b> prodotti su '+all.length+' senza codice a barre'
+    :'✓ Tutti i '+all.length+' prodotti hanno il codice a barre';
+  const list=all.filter(p=>!q||(p.nome+' '+(p.sku||'')+' '+(p.ean||'')+' '+(p.categoria||'')).toLowerCase().includes(q));
   const box=$('#prodList');
   if(!list.length){box.innerHTML='<div class="empty">'+(all.length?'Nessun prodotto trovato.':'Nessun prodotto. Aggiungine uno o usa l\'importazione qui sotto.')+'</div>';return}
   const soglia=Number(DB.shop.soglia)||0;
@@ -819,7 +927,8 @@ function renderProdotti(){
       : '<span class="badge warn">manca il prezzo di vendita</span> <span class="muted">costo '+eur(p.prezzo)+'</span>';
     return '<div class="item"><div class="grow">'
       +'<div class="t">'+esc(p.nome)+(p.attivo===false?' <span class="badge">non in vendita</span>':'')+'</div>'
-      +'<div class="s">'+(p.sku?esc(p.sku)+' · ':'')+prezzi+(p.categoria?' · '+esc(p.categoria):'')+(ric?' · venduti '+num(ven)+'/'+num(ric):'')+'</div></div>'
+      +'<div class="s">'+(p.sku?esc(p.sku)+' · ':'')+prezzi+(p.categoria?' · '+esc(p.categoria):'')+(ric?' · venduti '+num(ven)+'/'+num(ric):'')
+      +(codesOf(p).length?' · 🏷 '+esc(codesOf(p).join(', ')):' · <span class="badge warn">senza codice</span>')+'</div></div>'
       +'<div class="right">'+badge+'</div>'
       +'<button class="icobtn" data-load="'+p.id+'" title="Carico merce">📥</button>'
       +'<button class="icobtn" data-ed="'+p.id+'">✏️</button></div>';
@@ -830,12 +939,17 @@ function renderProdotti(){
 $('#qProd').addEventListener('input',renderProdotti);
 $('#btnNewProd').onclick=()=>prodSheet();
 
-function prodSheet(id){
+function prodSheet(id,preset){
   const p=id?prodById(id):null;
+  preset=preset||{};
   const cats=[...new Set(prods().map(x=>x.categoria).filter(Boolean))].sort();
   openSheet(
     '<h2>'+(p?'Modifica prodotto':'Nuovo prodotto')+'</h2>'
     +'<label class="f"><span>Nome *</span><input id="pN" value="'+esc(p?p.nome:'')+'" placeholder="Es. Collana argento"></label>'
+    +'<label class="f"><span>Codice a barre</span><div class="row" style="gap:8px">'
+    +'<input id="pE" class="grow" inputmode="numeric" autocomplete="off" placeholder="es. 8001234567890" value="'+esc(p?(p.ean||''):(preset.ean||''))+'">'
+    +'<button type="button" class="btn" id="pEScan" title="Leggi con la fotocamera">📷</button></div>'
+    +'<span class="tiny muted">se un articolo ha più codici, separali con una virgola</span></label>'
     +'<div class="row"><label class="f grow"><span>Codice / SKU</span><input id="pS" value="'+esc(p?p.sku:'')+'"></label>'
     +'<label class="f grow"><span>IVA (%)</span><input id="pI" type="number" inputmode="decimal" step="0.5" min="0" max="100" value="'+(p?ivaOf(p):ivaDef())+'"></label></div>'
     +'<div class="row"><label class="f grow"><span>Costo fornitore (€) *</span><input id="pP" type="number" inputmode="decimal" step="0.01" min="0" value="'+(p?p.prezzo:'')+'">'
@@ -885,6 +999,11 @@ function prodSheet(id){
     updM();
   };
   updM();
+  $('#pEScan').onclick=()=>apriLettore('uno',c=>{
+    const cur=splitCodes($('#pE').value);
+    if(!cur.includes(c))cur.push(c);
+    $('#pE').value=cur.join(', ');
+  });
   $('#pAnn').onclick=closeSheet;
   if(p)$('#pDel').onclick=()=>{
     const n=soldQty(p.id);
@@ -895,7 +1014,16 @@ function prodSheet(id){
   $('#pOk').onclick=()=>{
     const nome=$('#pN').value.trim();
     if(!nome){alert('Il nome è obbligatorio.');return}
-    const d={nome,sku:$('#pS').value.trim(),prezzo:parseNum($('#pP').value),pv:parseNum($('#pV').value),
+    /* un codice appartiene a un solo prodotto: se è già altrove, lo sposto qui */
+    const codici=splitCodes($('#pE').value);
+    for(const c of codici){
+      const x=prods().find(o=>o!==p&&codesOf(o).includes(c));
+      if(x){
+        if(!confirm('Il codice '+c+' appartiene già a "'+x.nome+'".\nLo sposto su questo prodotto?'))return;
+        x.ean=codesOf(x).filter(k=>k!==c).join(', ');x.updatedAt=now();
+      }
+    }
+    const d={nome,sku:$('#pS').value.trim(),ean:codici.join(', '),prezzo:parseNum($('#pP').value),pv:parseNum($('#pV').value),
              iva:parseNum($('#pI').value),categoria:$('#pC').value.trim(),attivo:$('#pA').checked};
     if(p){Object.assign(p,d);p.updatedAt=now()}
     else{
@@ -1041,8 +1169,9 @@ function parseCSV(text){
 const HEAD={
   pv:/^(prezzo\s*(di\s*)?vendita|prezzo\s*(al\s*)?pubblico|vendita|pubblico|cartellino|scaffale|listino\s*vendita)/i,
   iva:/^(iva|aliquot|vat)/i,
+  ean:/^(ean|gtin|upc|bar\s*code|codice\s*(a\s*)?barre|cod\.?\s*(a\s*)?barre)/i,
   nome:/^(nome|prodotto|descri|articolo|denomin|oggetto)/i,
-  sku:/^(codice|cod\b|cod\.|sku|rif|barcode|ean)/i,
+  sku:/^(codice|cod\b|cod\.|sku|rif)/i,
   prezzo:/^(prezzo\s*(di\s*)?acquisto|prezzo\s*fornitore|costo|acquisto|imponibile|prezzo|importo|valore|p\.?\s*unit|listino)/i,
   qta:/^(q\.?t|quant|pezzi|pz\b|n\.?\s*pezzi|ricevut|consegn|carico|giacen|scorta|stock)/i,
   categoria:/^(categor|famiglia|tipo|gruppo|linea|reparto|collezione)/i
@@ -1054,12 +1183,13 @@ function mapRows(rows){
     (rows[i]||[]).forEach((cell,j)=>{
       const s=String(cell==null?'':cell).trim();
       if(!s)return;
-      for(const k in HEAD)if(m[k]===undefined&&HEAD[k].test(s))m[k]=j;
+      /* ogni colonna va a un solo campo, il primo (più specifico) che la riconosce */
+      for(const k in HEAD)if(HEAD[k].test(s)){if(m[k]===undefined)m[k]=j;break}
     });
     if(m.nome!==undefined&&m.prezzo!==undefined){hi=i;map=m;break}
   }
   const headerFound=!!map;
-  if(!map)map={nome:0,sku:1,prezzo:2,qta:3,categoria:4,pv:5,iva:6};
+  if(!map)map={nome:0,sku:1,prezzo:2,qta:3,categoria:4,pv:5,iva:6,ean:7};
   const get=(r,k)=>map[k]===undefined?'':String(r[map[k]]==null?'':r[map[k]]).trim();
   const items=[];
   rows.slice(hi+1).forEach(r=>{
@@ -1069,6 +1199,7 @@ function mapRows(rows){
     const ivaTxt=get(r,'iva');
     items.push({
       nome,sku:get(r,'sku'),
+      ean:splitCodes(get(r,'ean')).join(', '),
       prezzo:parseNum(get(r,'prezzo')),
       pv:parseNum(get(r,'pv')),
       iva:ivaTxt===''?null:parseNum(ivaTxt),
@@ -1080,9 +1211,11 @@ function mapRows(rows){
 }
 
 function findExisting(it){
-  return prods().find(p=>
-    (it.sku&&p.sku&&p.sku.toLowerCase()===it.sku.toLowerCase())||
-    p.nome.toLowerCase()===it.nome.toLowerCase());
+  const cs=splitCodes(it.ean);                         // il codice a barre è il riscontro più affidabile
+  return (cs.length&&prods().find(p=>codesOf(p).some(c=>cs.includes(c))))
+    || prods().find(p=>
+      (it.sku&&p.sku&&p.sku.toLowerCase()===it.sku.toLowerCase())||
+      p.nome.toLowerCase()===it.nome.toLowerCase());
 }
 
 function importPreview(items,headerFound,origine){
@@ -1097,11 +1230,11 @@ function importPreview(items,headerFound,origine){
   openSheet(
     '<h2>Anteprima importazione</h2>'
     +'<p class="small muted" style="margin-top:-6px">'+esc(origine)+' — <b>'+items.length+'</b> prodotti riconosciuti'
-    +(headerFound?'':' <span class="badge warn">intestazioni non trovate: ho letto le colonne nell\'ordine Nome, Codice, Prezzo, Q.tà, Categoria</span>')+'</p>'
+    +(headerFound?'':' <span class="badge warn">intestazioni non trovate: ho letto le colonne nell\'ordine Nome, Codice, Costo, Q.tà, Categoria, Prezzo vendita, IVA%, Codice a barre</span>')+'</p>'
     +(noPrice?'<p class="small"><span class="badge warn">'+noPrice+' senza costo</span> verranno importati a 0,00 €, poi li correggi.</p>':'')
     +(noPv?'<p class="small"><span class="badge warn">'+noPv+' senza prezzo di vendita</span> li puoi completare dopo: senza, non entrano nel bilancio.</p>':'')
-    +'<div class="tw" style="max-height:38vh;overflow-y:auto"><table><thead><tr><th>Prodotto</th><th>Codice</th><th class="n">Costo</th><th class="n">Vendita</th><th class="n">IVA</th><th class="n">Q.tà</th><th>Categoria</th></tr></thead><tbody>'
-    +items.slice(0,60).map(i=>'<tr><td>'+esc(i.nome)+(findExisting(i)?' <span class="badge warn">già presente</span>':'')+'</td><td>'+esc(i.sku)+'</td><td class="n">'+eur(i.prezzo)
+    +'<div class="tw" style="max-height:38vh;overflow-y:auto"><table><thead><tr><th>Prodotto</th><th>Codice</th><th>Codice a barre</th><th class="n">Costo</th><th class="n">Vendita</th><th class="n">IVA</th><th class="n">Q.tà</th><th>Categoria</th></tr></thead><tbody>'
+    +items.slice(0,60).map(i=>'<tr><td>'+esc(i.nome)+(findExisting(i)?' <span class="badge warn">già presente</span>':'')+'</td><td>'+esc(i.sku)+'</td><td>'+esc(i.ean||'—')+'</td><td class="n">'+eur(i.prezzo)
       +'</td><td class="n">'+(i.pv?eur(i.pv):'—')+'</td><td class="n">'+num(i.iva!=null?i.iva:ivaDef())+'%</td><td class="n">'+(i.qta?num(i.qta):'')+'</td><td>'+esc(i.categoria)+'</td></tr>').join('')
     +'</tbody></table></div>'
     +(items.length>60?'<p class="tiny muted">…e altri '+(items.length-60)+'.</p>':'')
@@ -1121,6 +1254,7 @@ function applyImport(items,update){
       if(!update){skip++;return}
       ex.nome=it.nome;
       if(it.sku)ex.sku=it.sku;
+      splitCodes(it.ean).forEach(c=>addCode(ex,c));
       if(it.prezzo)ex.prezzo=it.prezzo;
       if(it.pv)ex.pv=it.pv;
       if(it.iva!=null)ex.iva=it.iva;
@@ -1128,7 +1262,7 @@ function applyImport(items,update){
       ex.updatedAt=now();upd++;
       if(it.qta>0)DB.loads.push({id:uid(),productId:ex.id,qta:it.qta,data:today(),note:'Importazione',updatedAt:now()});
     }else{
-      const p={id:uid(),nome:it.nome,sku:it.sku,prezzo:it.prezzo,pv:it.pv||0,
+      const p={id:uid(),nome:it.nome,sku:it.sku,ean:it.ean||'',prezzo:it.prezzo,pv:it.pv||0,
                iva:it.iva!=null?it.iva:ivaDef(),categoria:it.categoria,attivo:true,updatedAt:now()};
       DB.products.push(p);added++;
       if(it.qta>0)DB.loads.push({id:uid(),productId:p.id,qta:it.qta,data:today(),note:'Carico iniziale',updatedAt:now()});
@@ -1969,7 +2103,313 @@ function qrSvg(text,px){
 window.qrBuild=qrBuild;
 
 /* ==========================================================================
-   8. AVVIO
+   8. LETTORE DI CODICI A BARRE
+   Due motori: quello integrato nel browser (Chrome su Android) e, dove manca
+   (PC, Samsung Internet, iPhone), la libreria ZXing inclusa in vendor/ e
+   caricata solo quando serve. In più i lettori USB/Bluetooth, che per il
+   computer sono una tastiera velocissima: scrivono il codice e premono Invio.
+   ========================================================================== */
+const SCAN_FORMATI=['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf'];
+let zxingP=null;
+function caricaZXing(){
+  if(window.ZXing)return Promise.resolve();
+  if(!zxingP)zxingP=new Promise((ok,ko)=>{
+    const s=document.createElement('script');
+    s.src='./vendor/zxing.min.js';
+    s.onload=ok;
+    s.onerror=()=>{zxingP=null;ko(new Error('Non riesco a caricare il lettore: controlla la connessione e riprova.'))};
+    document.head.appendChild(s);
+  });
+  return zxingP;
+}
+async function creaLettore(){
+  if('BarcodeDetector' in window){
+    try{
+      const ok=await BarcodeDetector.getSupportedFormats();
+      const f=SCAN_FORMATI.filter(x=>ok.includes(x));
+      if(f.length){
+        const d=new BarcodeDetector({formats:f});
+        return{motore:'integrato',leggi:async src=>{const r=await d.detect(src);return r.length?r[0].rawValue:null}};
+      }
+    }catch(e){}
+  }
+  await caricaZXing();
+  const Z=window.ZXing,hints=new Map();
+  hints.set(Z.DecodeHintType.POSSIBLE_FORMATS,[Z.BarcodeFormat.EAN_13,Z.BarcodeFormat.EAN_8,Z.BarcodeFormat.UPC_A,
+    Z.BarcodeFormat.UPC_E,Z.BarcodeFormat.CODE_128,Z.BarcodeFormat.CODE_39,Z.BarcodeFormat.ITF]);
+  hints.set(Z.DecodeHintType.TRY_HARDER,true);
+  const reader=new Z.MultiFormatReader();reader.setHints(hints);
+  const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});
+  return{motore:'libreria',leggi:async src=>{
+    const w=src.videoWidth||src.naturalWidth||src.width,h=src.videoHeight||src.naturalHeight||src.height;
+    if(!w||!h)return null;
+    const k=Math.min(1,960/Math.max(w,h));            // oltre i 960 px si rallenta senza leggere meglio
+    cv.width=Math.round(w*k);cv.height=Math.round(h*k);
+    cx.drawImage(src,0,0,cv.width,cv.height);
+    try{
+      const bmp=new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)));
+      return reader.decodeWithState(bmp).getText();
+    }catch(e){return null}                            // nessun codice in questo fotogramma
+  }};
+}
+
+let actx=null;
+function suono(ok){
+  try{
+    actx=actx||new(window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==='suspended')actx.resume();
+    const o=actx.createOscillator(),g=actx.createGain(),t=actx.currentTime,d=ok?.12:.28;
+    o.type='square';o.frequency.value=ok?1500:300;
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(.15,t+.01);
+    g.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o.connect(g);g.connect(actx.destination);o.start(t);o.stop(t+d+.02);
+  }catch(e){}
+  try{if(navigator.vibrate)navigator.vibrate(ok?30:[60,40,60])}catch(e){}
+}
+
+/* modo 'vendi': ogni lettura registra una vendita
+   modo 'associa': abbina i codici ai prodotti, senza vendere
+   modo 'uno': una sola lettura, restituita a chi ha aperto il lettore */
+let SC=null;
+
+async function apriLettore(modo,alCodice,opt){
+  opt=opt||{};
+  chiudiLettore();
+  const s=SC={modo,alCodice,stream:null,lettore:null,timer:0,pausa:false,ultimo:'',vistoIl:0,sess:{},fine:false,torcia:false};
+  try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}  // il suono va sbloccato su un tocco
+  $('#scTitle').textContent={vendi:'Scansiona e vendi',associa:'Associa i codici',uno:'Leggi il codice'}[modo];
+  $('#scPanel').innerHTML='';
+  $('#scManual').value='';
+  $('#scTorch').classList.add('hidden');
+  $('#scMsg').classList.add('hidden');
+  $('#scanOv').classList.remove('hide');
+  document.body.style.overflow='hidden';
+
+  if(opt.camera===false){
+    messaggio('Lettore esterno: continua a leggere i codici, oppure digitali qui sotto.');
+    stato('');
+    return;
+  }
+  stato('Avvio la fotocamera…');
+  try{s.lettore=await creaLettore()}
+  catch(e){messaggio(e.message);stato('Puoi comunque digitare il codice qui sotto.');return}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    messaggio('Questo browser non dà accesso alla fotocamera.');
+    stato('Digita il codice qui sotto, oppure usa un lettore USB.');
+    return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:false,
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}});
+    if(SC!==s||s.fine){stream.getTracks().forEach(t=>t.stop());return}   // chiuso mentre si avviava
+    s.stream=stream;
+    const v=$('#scVideo');
+    v.srcObject=stream;
+    await v.play().catch(()=>{});
+    const tr=stream.getVideoTracks()[0];
+    try{
+      const cap=tr.getCapabilities?tr.getCapabilities():{};
+      if(cap.focusMode&&cap.focusMode.includes('continuous'))tr.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+      if(cap.torch)$('#scTorch').classList.remove('hidden');
+    }catch(e){}
+    stato('Inquadra il codice dentro il riquadro');
+    ciclo();
+  }catch(e){
+    const n=e&&e.name;
+    messaggio(n==='NotAllowedError'?'Accesso alla fotocamera negato. Consentilo dalle impostazioni del sito (il lucchetto accanto all\'indirizzo) e riapri il lettore.'
+      :(n==='NotFoundError'||n==='OverconstrainedError')?'Nessuna fotocamera trovata.'
+      :n==='NotReadableError'?'La fotocamera è occupata da un\'altra app.'
+      :'Non riesco ad avviare la fotocamera.');
+    stato('Puoi comunque digitare il codice qui sotto'+(matchMedia('(pointer:fine)').matches?', o usare un lettore USB.':'.'));
+  }
+}
+function chiudiLettore(){
+  if(!SC)return;
+  SC.fine=true;clearTimeout(SC.timer);
+  if(SC.stream)SC.stream.getTracks().forEach(t=>t.stop());
+  const v=$('#scVideo');v.pause();v.srcObject=null;
+  SC=null;
+  $('#scanOv').classList.add('hide');
+  document.body.style.overflow='';
+}
+const stato=t=>{$('#scStat').textContent=t};
+function messaggio(t){const m=$('#scMsg');m.textContent=t;m.classList.remove('hidden')}
+function lampo(ok){
+  const h=$('#scHit');
+  h.classList.toggle('bad',!ok);h.classList.add('on');
+  setTimeout(()=>h.classList.remove('on'),60);
+}
+
+function ciclo(){
+  const s=SC;
+  if(!s||s.fine)return;
+  const v=$('#scVideo');
+  const avanti=()=>{if(SC===s&&!s.fine)s.timer=setTimeout(ciclo,s.lettore.motore==='integrato'?100:150)};
+  if(s.pausa||v.readyState<2){avanti();return}
+  s.lettore.leggi(v)
+    .then(c=>{if(SC===s&&!s.fine&&!s.pausa&&c)vistoCodice(c)})
+    .catch(()=>{})
+    .finally(avanti);
+}
+
+/* un codice tenuto davanti alla fotocamera viene letto molte volte al secondo:
+   conta una volta sola, e torna valido dopo essere uscito dall'inquadratura */
+function vistoCodice(raw){
+  const c=normCode(raw),t=now();
+  if(!c)return;
+  if(c===SC.ultimo&&t-SC.vistoIl<1300){SC.vistoIl=t;return}
+  SC.ultimo=c;SC.vistoIl=t;
+  codiceLetto(c);
+}
+
+function codiceLetto(c){
+  const s=SC;
+  if(!s)return;
+  if(s.modo==='uno'){suono(true);lampo(true);const cb=s.alCodice;chiudiLettore();if(cb)cb(c);return}
+  const p=prodByCode(c);
+  if(s.modo==='associa'){
+    if(p){suono(true);lampo(true);risultato('ok','Già associato',esc(p.nome)+' · '+esc(c));return}
+    suono(false);lampo(false);chiediProdotto(c);return;
+  }
+  if(!p){suono(false);lampo(false);chiediProdotto(c);return}
+  if(!(p.pv>0)){suono(false);chiudiLettore();saleSheet(p.id);toast('Manca il prezzo di vendita: indicalo qui');return}
+  suono(true);lampo(true);
+  mostraVendita(p,vendiUno(p,{quiet:true}));
+}
+
+function risultato(tipo,titolo,sotto,azioni){
+  $('#scPanel').innerHTML='<div class="scanres '+tipo+'"><div class="grow"><div class="t">'+titolo+'</div><div class="s">'+sotto+'</div></div>'
+    +(azioni||'')+'</div>'+riepilogoHtml();
+}
+function riepilogoHtml(){
+  if(!SC||SC.modo!=='vendi')return '';
+  const righe=Object.keys(SC.sess).map(pid=>({p:prodById(pid),n:SC.sess[pid]})).filter(x=>x.p&&x.n>0);
+  if(!righe.length)return '';
+  const pezzi=righe.reduce((a,x)=>a+x.n,0),tot=cent(righe.reduce((a,x)=>a+x.n*(x.p.pv||0),0));
+  return '<div class="scanlist"><b>Letti in questa sessione:</b> '+num(pezzi)+(pezzi===1?' pezzo':' pezzi')+' · '+eur(tot)+'<br>'
+    +righe.map(x=>esc(x.p.nome)+' × '+num(x.n)).join(' · ')+'</div>';
+}
+function mostraVendita(p,sale){
+  if(!sale)return;
+  SC.sess[p.id]=(SC.sess[p.id]||0)+1;
+  const id=sale.id;
+  risultato('ok','✓ '+esc(p.nome),num(sale.qta)+' × '+eur(p.pv)+' = <b>'+eur(cent(sale.qta*p.pv))+'</b>',
+    '<button class="btn sm" id="scUndo">Annulla</button>');
+  $('#scUndo').onclick=()=>{
+    const rest=annullaUno(p,id);
+    if(SC){SC.sess[p.id]=Math.max(0,(SC.sess[p.id]||0)-1);SC.ultimo=''}   // lo stesso articolo si può rileggere subito
+    risultato('',rest?'Tornato a '+num(rest)+' × '+esc(p.nome):'Annullata: '+esc(p.nome),'Puoi continuare a leggere');
+  };
+}
+
+/* codice mai visto: si sceglie a quale prodotto appartiene (e in modalità
+   vendita la vendita parte subito, perché l'articolo è lì sul banco) */
+function chiediProdotto(c){
+  SC.pausa=true;
+  $('#scPanel').innerHTML=
+    '<div class="scanres ko"><div class="grow"><div class="t">Codice non associato</div><div class="s">'+esc(c)+' · a quale prodotto appartiene?</div></div></div>'
+    +'<input id="scFind" placeholder="Cerca il prodotto…" autocomplete="off" style="margin-bottom:6px">'
+    +'<div id="scPick" style="max-height:38vh;overflow-y:auto;margin-bottom:10px"></div>'
+    +'<div class="row" style="gap:8px;margin-bottom:10px"><button class="btn grow" id="scSkip">Salta</button><button class="btn grow" id="scNew">+ Nuovo prodotto</button></div>';
+  const disegna=()=>{
+    const q=$('#scFind').value.trim().toLowerCase();
+    const lista=prods()
+      .filter(p=>!q||(p.nome+' '+(p.sku||'')+' '+(p.categoria||'')).toLowerCase().includes(q))
+      .sort((a,b)=>(codesOf(a).length?1:0)-(codesOf(b).length?1:0)||a.nome.localeCompare(b.nome,'it'));   // prima quelli ancora senza codice
+    $('#scPick').innerHTML=lista.slice(0,50).map(p=>'<div class="pickrow" data-id="'+p.id+'"><div class="grow"><div class="t">'+esc(p.nome)+'</div><div class="s">'
+      +(p.sku?esc(p.sku)+' · ':'')+(p.pv>0?eur(p.pv):'senza prezzo')+(codesOf(p).length?' · ha già un codice':'')+'</div></div><span>›</span></div>').join('')
+      ||'<div class="muted small" style="padding:8px 4px">Nessun prodotto trovato.</div>';
+    $$('#scPick .pickrow').forEach(r=>r.onclick=()=>scegli(prodById(r.dataset.id)));
+  };
+  const riprendi=()=>{if(SC){SC.pausa=false;SC.ultimo=c;SC.vistoIl=now()}};   // non rileggere subito lo stesso codice
+  const scegli=p=>{
+    if(codesOf(p).length&&!confirm('"'+p.nome+'" ha già il codice '+codesOf(p).join(', ')+'.\nAggiungo anche '+c+'?'))return;
+    addCode(p,c);save();
+    if(SC.modo==='vendi'){
+      if(!(p.pv>0)){chiudiLettore();saleSheet(p.id);toast('Codice associato. Manca il prezzo di vendita: indicalo qui');return}
+      riprendi();suono(true);
+      mostraVendita(p,vendiUno(p,{quiet:true}));
+    }else{
+      riprendi();
+      risultato('ok','✓ Associato',esc(c)+' → '+esc(p.nome));
+    }
+    renderProdotti();
+  };
+  $('#scFind').oninput=disegna;
+  $('#scSkip').onclick=()=>{riprendi();risultato('','Saltato',esc(c)+' resta senza prodotto')};
+  $('#scNew').onclick=()=>{chiudiLettore();prodSheet(null,{ean:c})};
+  disegna();
+}
+
+$('#scClose').onclick=chiudiLettore;
+$('#scTorch').onclick=()=>{
+  if(!SC||!SC.stream)return;
+  SC.torcia=!SC.torcia;
+  SC.stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:SC.torcia}]}).catch(()=>{});
+  $('#scTorch').classList.toggle('primary',SC.torcia);
+};
+const invioManuale=()=>{
+  const c=normCode($('#scManual').value);
+  $('#scManual').value='';
+  if(c&&SC){SC.ultimo='';codiceLetto(c)}
+};
+$('#scGo').onclick=invioManuale;
+$('#scManual').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();invioManuale()}});
+$('#btnScan').onclick=()=>apriLettore('vendi');
+$('#btnAssoc').onclick=()=>apriLettore('associa');
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&SC)chiudiLettore()});   // la fotocamera non resta accesa in background
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&SC)chiudiLettore()});
+
+/* --- lettori USB / Bluetooth ---
+   Li riconosco dalla velocità: una persona non batte 8-13 cifre in pochi
+   millisecondi l'una dall'altra. I campi di testo gestiscono l'Invio da sé. */
+const KB={buf:'',t:0,veloci:0};
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.altKey||e.metaKey)return;
+  const el=e.target;
+  if(el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT'||el.isContentEditable))return;
+  const t=performance.now();
+  if(e.key==='Enter'){
+    const code=KB.buf,veloci=KB.veloci;
+    KB.buf='';KB.veloci=0;
+    if(code.length>=6&&veloci>=code.length-2){e.preventDefault();e.stopPropagation();letturaEsterna(code)}
+    return;
+  }
+  if(e.key.length!==1)return;
+  if(t-KB.t>80){KB.buf='';KB.veloci=0}else KB.veloci++;
+  KB.buf+=e.key;KB.t=t;
+},true);
+
+function letturaEsterna(raw){
+  const c=normCode(raw);
+  if(!c)return;
+  if(SC){SC.ultimo='';codiceLetto(c);return}                    // lettore aperto: stessa strada della fotocamera
+  if(!$('#ov').classList.contains('hide'))return;                // c'è una scheda aperta: non vendo alle spalle
+  const vista=($$('.view').find(v=>v.classList.contains('active'))||{}).id;
+  const p=prodByCode(c);
+  if(vista==='v-vendi'){
+    if(p){suono(true);vendiUno(p)}
+    else{suono(false);apriLettore('vendi',null,{camera:false}).then(()=>{if(SC)chiediProdotto(c)})}
+  }else if(vista==='v-prodotti'){
+    if(p)prodSheet(p.id);else prodSheet(null,{ean:c});
+  }else toast('Per vendere con il lettore vai nella schermata Vendi');
+}
+
+/* nella ricerca di Vendi: codice completo + Invio = vendita */
+$('#qSearch').addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  const v=$('#qSearch').value,p=prodByCode(v);
+  if(p){e.preventDefault();$('#qSearch').value='';renderVendi();suono(true);vendiUno(p);return}
+  if(/^\d{6,14}$/.test(v.trim())){
+    e.preventDefault();$('#qSearch').value='';renderVendi();suono(false);
+    const c=normCode(v);
+    apriLettore('vendi',null,{camera:false}).then(()=>{if(SC)chiediProdotto(c)});
+  }
+});
+
+/* ==========================================================================
+   9. AVVIO
    ========================================================================== */
 window.switchView=switchView;
 const paired=readPairing();

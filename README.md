@@ -60,6 +60,34 @@ così i totali coincidono sempre con la somma di ciò che si legge nel documento
 Il prospetto IVA è un conteggio gestionale sulla merce venduta nel periodo: **non è la
 liquidazione IVA**, che segue le fatture registrate e non il momento della vendita.
 
+## Codici a barre
+
+Ogni prodotto può avere uno o più codici (campo `ean`, separati da virgola). Si leggono in tre modi:
+
+- **Fotocamera** — *Vendi → Scansiona codice a barre*. Ogni lettura registra una vendita con le
+  stesse regole del tocco (contatore, fusione delle letture ravvicinate, Annulla un pezzo alla
+  volta). Un codice tenuto davanti all'obiettivo conta una volta sola: torna valido dopo essere
+  uscito dall'inquadratura. Codice sconosciuto → si sceglie il prodotto (prima quelli ancora senza
+  codice) e la vendita parte subito, oppure si crea un prodotto nuovo col codice già compilato.
+- **Lettore USB/Bluetooth** — per il computer è una tastiera che scrive il codice e preme Invio.
+  L'app lo riconosce dalla velocità (una persona non batte 13 cifre in pochi millisecondi):
+  in *Vendi* registra la vendita, in *Prodotti* apre la scheda del prodotto o ne crea uno nuovo.
+  Con una scheda aperta non vende; l'Invio del lettore non attiva il pulsante eventualmente a fuoco.
+- **A mano** — codice completo nella ricerca di *Vendi* + Invio.
+
+Due motori di lettura: `BarcodeDetector`, integrato in Chrome per Android, e dove manca (Windows,
+Samsung Internet, iPhone) la libreria [ZXing](https://github.com/zxing-js/library) 0.23,
+inclusa in `vendor/` (licenza Apache 2.0) e caricata solo quando serve. Formati: EAN-13, EAN-8,
+UPC-A/E, Code 128, Code 39, ITF. I codici si confrontano normalizzati: un UPC-A a 12 cifre è lo
+stesso EAN-13 con uno zero davanti, e la notazione scientifica di Excel viene riportata a cifre.
+
+*Prodotti → Associa i codici* serve alla prima configurazione: si passano gli articoli davanti
+alla fotocamera e si sceglie per ciascuno il prodotto, senza registrare vendite.
+Nell'importazione da Excel la colonna "Codice a barre" / "EAN" viene riconosciuta da sola.
+
+`esempio-codici.html` mostra i codici del listino di esempio da inquadrare per le prove: EAN-13
+della serie 200, riservata all'uso interno dei negozi, quindi mai coincidenti con prodotti reali.
+
 ## Sincronizzazione telefono ↔ PC (opzionale)
 
 L'archivio può essere salvato in un **Gist privato** del proprio account GitHub, così tutti i
@@ -103,7 +131,9 @@ anche la sincronizzazione, altrimenti l'archivio condiviso rimanderebbe tutto in
 | File | Ruolo |
 |---|---|
 | `index.html` | tutta l'app: interfaccia, logica, lettore e generatore XLSX, sincronizzazione |
-| `esempio-prodotti.xlsx` | listino di prova con 20 articoli |
+| `esempio-prodotti.xlsx` | listino di prova: 32 articoli con codici a barre, tre aliquote |
+| `esempio-codici.html` | i codici a barre del listino di prova, da inquadrare o stampare |
+| `vendor/zxing.min.js` | libreria di lettura dei codici (ZXing 0.23, Apache 2.0, licenza accanto) |
 | `manifest.json` | installazione come app sul telefono |
 | `sw.js` | service worker: funzionamento offline |
 
