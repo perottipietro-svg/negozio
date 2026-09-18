@@ -237,6 +237,8 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
   min-height:56px;margin-bottom:10px}
 .scanres .t{font-weight:700;font-size:15px}
 .scanres .s{font-size:12.5px;color:#9aa7b2}
+.scanres .s b{color:#e8edf2}
+.scanres.ok .t{color:#5eead4}
 .scanres.ok{border-color:#2dd4bf}
 .scanres.ko{border-color:#f87171}
 .scanlist{font-size:13px;color:#cbd5e1;margin:0 2px 10px}
@@ -515,7 +517,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
 
 <script>
 "use strict";
-const APP_VER='2026.09.18-1';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
+const APP_VER='2026.09.18-2';   /* mostrata in Impostazioni: serve a capire se l'aggiornamento è arrivato */
 
 /* ==========================================================================
    1. STORAGE
@@ -2185,6 +2187,7 @@ async function apriLettore(modo,alCodice,opt){
   $('#scMsg').classList.add('hidden');
   $('#scanOv').classList.remove('hide');
   document.body.style.overflow='hidden';
+  if(modo==='vendi')$('#scPanel').innerHTML='<div class="scanlist muted">Ogni codice letto viene registrato subito come venduto: non c\'è niente da confermare. Se sbagli, c\'è Annulla. Quando hai finito, premi Fine.</div>';
 
   if(opt.camera===false){
     messaggio('Lettore esterno: continua a leggere i codici, oppure digitali qui sotto.');
@@ -2294,12 +2297,15 @@ function mostraVendita(p,sale){
   if(!sale)return;
   SC.sess[p.id]=(SC.sess[p.id]||0)+1;
   const id=sale.id;
-  risultato('ok','✓ '+esc(p.nome),num(sale.qta)+' × '+eur(p.pv)+' = <b>'+eur(cent(sale.qta*p.pv))+'</b>',
+  /* deve essere chiaro che la vendita è GIÀ registrata: non c'è niente da confermare */
+  risultato('ok',sale.qta>1?'✓ Registrato il '+num(sale.qta)+'° pezzo':'✓ Vendita registrata',
+    '<b>'+esc(p.nome)+'</b> · '+num(sale.qta)+' × '+eur(p.pv)+' = <b>'+eur(cent(sale.qta*p.pv))+'</b>',
     '<button class="btn sm" id="scUndo">Annulla</button>');
   $('#scUndo').onclick=()=>{
     const rest=annullaUno(p,id);
     if(SC){SC.sess[p.id]=Math.max(0,(SC.sess[p.id]||0)-1);SC.ultimo=''}   // lo stesso articolo si può rileggere subito
-    risultato('',rest?'Tornato a '+num(rest)+' × '+esc(p.nome):'Annullata: '+esc(p.nome),'Puoi continuare a leggere');
+    risultato('',rest?'Annullato un pezzo':'Vendita annullata',
+      '<b>'+esc(p.nome)+'</b>'+(rest?' · ora '+num(rest)+' × '+eur(p.pv):'')+' · puoi continuare a leggere');
   };
 }
 
